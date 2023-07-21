@@ -4,15 +4,16 @@ RUN apt-get update && apt-get install -y debootstrap=1.0.126+nmu1ubuntu0.5 squas
 COPY functions /usr/share/debootstrap/functions
 COPY InRelease /replicate/InRelease
 RUN LOCAL_INRELEASE_PATH=/replicate/InRelease debootstrap --include=busybox-static --foreign --arch riscv64 jammy /replicate/release
-
 RUN rm -rf /replicate/release/debootstrap/debootstrap.log
 RUN touch /replicate/release/debootstrap/debootstrap.log
 RUN echo -n "ubuntu" > /replicate/release/etc/hostname
-RUN du -s -h /replicate/release
+RUN dpkg-deb -x /replicate/release/var/cache/apt/archives/busybox-static* /replicate/release/debootstrap
+COPY bootstrap /replicate/release/debootstrap/bootstrap
+RUN chmod +x /replicate/release/debootstrap/bootstrap
 RUN find "/replicate/release" \
 	-newermt "@1689943775" \
 	-exec touch --no-dereference --date="@1689943775" '{}' +
-RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -f -d /replicate/release -b 1048576 /replicate/image.ext2
+RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -f -d /replicate/release -b 8388608 /replicate/image.ext2
 RUN sha256sum /replicate/image.ext2
 
 #RUN mksquashfs /replicate/release /replicate/release.squashfs -all-time 1689943775 -reproducible -mkfs-time 0

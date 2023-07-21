@@ -1,0 +1,3 @@
+#!/debootstrap/bin/static-sh
+/debootstrap/debootstrap --second-stage
+/debootstrap/bin/busybox cat /debootstrap/debootstrap.log
