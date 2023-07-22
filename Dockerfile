@@ -13,7 +13,7 @@ RUN chmod +x /replicate/release/debootstrap/bootstrap
 RUN find "/replicate/release" \
 	-newermt "@1689943775" \
 	-exec touch --no-dereference --date="@1689943775" '{}' +
-RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -f -d /replicate/release -b 8388608 /replicate/image.ext2
+RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /replicate/release -b 8388608 /replicate/image.ext2
 RUN sha256sum /replicate/image.ext2
 
 #RUN mksquashfs /replicate/release /replicate/release.squashfs -all-time 1689943775 -reproducible -mkfs-time 0
