@@ -1,3 +1,7 @@
-#!/debootstrap/bin/static-sh
+#!/bin/bash
 /debootstrap/debootstrap --second-stage
-/debootstrap/bin/busybox cat /debootstrap/debootstrap.log
+mount -o remount,ro /
+sync
+halt -f
+
+
