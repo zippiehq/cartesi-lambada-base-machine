@@ -1,6 +1,7 @@
 #!/bin/bash
 /debootstrap/debootstrap --second-stage
-mount -o remount,ro /
+rm -rf /debootstrap
+mount -f -o remount,ro /
 sync
 halt -f
 

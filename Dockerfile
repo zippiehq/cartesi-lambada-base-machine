@@ -5,7 +5,7 @@ COPY debootstrap.patch /debootstrap.patch
 RUN patch -p1 < /debootstrap.patch
 RUN rm -rf /debootstrap.patch*
 COPY InRelease /replicate/InRelease
-RUN LOCAL_INRELEASE_PATH=/replicate/InRelease debootstrap --foreign --arch riscv64 jammy /replicate/release
+RUN LOCAL_INRELEASE_PATH=/replicate/InRelease debootstrap --include psmisc --foreign --arch riscv64 jammy /replicate/release
 RUN rm -rf /replicate/release/debootstrap/debootstrap.log
 RUN touch /replicate/release/debootstrap/debootstrap.log
 RUN echo -n "ubuntu" > /replicate/release/etc/hostname
