@@ -11,6 +11,7 @@ RUN touch /replicate/release/debootstrap/debootstrap.log
 RUN echo -n "ubuntu" > /replicate/release/etc/hostname
 COPY bootstrap /replicate/release/debootstrap/bootstrap
 RUN chmod +x /replicate/release/debootstrap/bootstrap
+RUN echo "nameserver 127.0.0.1" > /replicate/release/etc/resolv.conf
 RUN find "/replicate/release" \
 	-newermt "@1689943775" \
 	-exec touch --no-dereference --date="@1689943775" '{}' +
