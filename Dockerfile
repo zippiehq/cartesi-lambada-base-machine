@@ -1,6 +1,12 @@
+FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS genext2fs-build
+RUN apt-get update && apt-get install -y git
+RUN git clone https://github.com/cartesi/genext2fs /genext2fs && cd /genext2fs && git checkout v1.5.2 && ./make-debian
+
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS build
 
-RUN apt-get update && apt-get install -y debootstrap=1.0.126+nmu1ubuntu0.5 genext2fs=1.5.0-2 patch=2.7.6-7build2
+RUN apt-get update && apt-get install -y debootstrap=1.0.126+nmu1ubuntu0.5 patch=2.7.6-7build2 libarchive13
+COPY --from=genext2fs-build /genext2fs/genext2fs.deb /genext2fs.deb
+RUN dpkg -i /genext2fs.deb
 COPY debootstrap.patch /debootstrap.patch
 RUN patch -p1 < /debootstrap.patch
 RUN rm -rf /debootstrap.patch*
@@ -10,7 +16,7 @@ RUN rm -rf /replicate/release/debootstrap/debootstrap.log
 RUN touch /replicate/release/debootstrap/debootstrap.log
 RUN echo -n "ubuntu" > /replicate/release/etc/hostname
 COPY bootstrap /replicate/release/debootstrap/bootstrap
-RUN chmod +x /replicate/release/debootstrap/bootstrap
+RUN chmod 755 /replicate/release/debootstrap/bootstrap
 RUN echo "nameserver 127.0.0.1" > /replicate/release/etc/resolv.conf
 RUN rm -df /replicate/release/proc
 RUN mkdir -p /replicate/release/proc
