@@ -23,6 +23,8 @@ RUN mkdir -p /replicate/release/proc
 RUN chmod 555 /replicate/release/proc
 COPY additional /replicate/release/sbin/install-from-mtdblock1
 RUN chmod 755 /replicate/release/sbin/install-from-mtdblock1
+RUN cd / && wget -O /replicate/release/sbin/repro-get https://github.com/reproducible-containers/repro-get/releases/download/v0.4.0/repro-get-v0.4.0.linux-riscv64 && chmod 755 /replicate/release/sbin/repro-get
+
 RUN find "/replicate/release" \
 	-newermt "@1689943775" \
 	-exec touch --no-dereference --date="@1689943775" '{}' +
@@ -59,5 +61,32 @@ RUN \
 COPY --from=build /replicate/image.ext2 /image.ext2
 RUN /opt/cartesi/bin/cartesi-machine --append-rom-bootargs="loglevel=8 init=/debootstrap/bootstrap" --flash-drive=label:root,filename:/image.ext2,shared --ram-length=2Gi
 RUN sha256sum /image.ext2
+RUN apt-get update && apt-get install -y e2tools
+COPY extract-tar /tool-image/install
+
+RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /tool-image -b 2097152 /tool-image.img
+RUN /opt/cartesi/bin/cartesi-machine --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image.img,shared --ram-length=2Gi
+RUN e2cp tool-image.img:/rootfs.tar /rootfs.tar
+RUN mkdir -p /rootfs && cd /rootfs && tar xf /rootfs.tar
+#RUN cd / && wget -O repro-get https://github.com/reproducible-containers/repro-get/releases/download/v0.4.0/repro-get-v0.4.0.linux-riscv64 && chmod +x repro-get
+
+FROM scratch AS riscv-base
+COPY --from=debootstrap /rootfs /
+FROM riscv-base AS riscv-install
+RUN apt-get update && apt-get install -y build-essential
+RUN repro-get hash generate --dedupe=/etc/repro-get/SHA256SUMS-riscv64 > /etc/repro-get/SHA25SUMS-riscv64-new
+RUN repro-get download /etc/repro-get/SHA25SUMS-riscv64-new
+FROM debootstrap AS pkg-install
+COPY install-pkgs /tool-image/install
+COPY --from=riscv-install /var/cache/repro-get /tool-image/repro-get-cache
+COPY --from=riscv-install /etc/repro-get/SHA25SUMS-riscv64-new /tool-image/SHA25SUMS-riscv64-new
+
+RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /tool-image -b 2097152 /tool-image.img
+RUN /opt/cartesi/bin/cartesi-machine --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
+RUN sha256sum /image.ext2
+#FROM riscv-base AS foo
+#COPY --from=riscv-install /var/cache/repro-get /var/cache/repro-get
+#COPY --from=riscv-install /etc/repro-get/SHA25SUMS-riscv64-new /etc/repro-get/SHA25SUMS-riscv64-new
+#RUN repro-get install /etc/repro-get/SHA25SUMS-riscv64-new
 FROM busybox
 COPY --from=debootstrap /image.ext2 /image.ext2

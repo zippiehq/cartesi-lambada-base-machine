@@ -1,0 +1,2 @@
+#!/bin/sh
+tar -pcSf /mnt/rootfs.tar --one-file-system /
