@@ -21,6 +21,8 @@ RUN echo "nameserver 127.0.0.1" > /replicate/release/etc/resolv.conf
 RUN rm -df /replicate/release/proc
 RUN mkdir -p /replicate/release/proc
 RUN chmod 555 /replicate/release/proc
+COPY additional /replicate/release/sbin/install-from-mtdblock1
+RUN chmod 755 /replicate/release/sbin/install-from-mtdblock1
 RUN find "/replicate/release" \
 	-newermt "@1689943775" \
 	-exec touch --no-dereference --date="@1689943775" '{}' +
