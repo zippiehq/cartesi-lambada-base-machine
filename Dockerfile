@@ -28,7 +28,7 @@ RUN cd / && wget -O /replicate/release/sbin/repro-get https://github.com/reprodu
 RUN find "/replicate/release" \
 	-newermt "@1689943775" \
 	-exec touch --no-dereference --date="@1689943775" '{}' +
-RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /replicate/release -b 2097152 /replicate/image.ext2
+RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /replicate/release -B 4096 -b 4194304 /replicate/image.ext2
 RUN sha256sum /replicate/image.ext2
 
 FROM ubuntu:22.04 AS debootstrap
@@ -49,7 +49,7 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y \
     libcrypto++8 \
     wget \
     && rm -rf /var/lib/apt/lists/*
-    
+
 COPY --from=cartesi/machine-emulator@sha256:02fede36987b5eb5cc698f9fe281eb1ef2c56cd07cdbf982a4401095ffe0129b /opt/cartesi /opt/cartesi
 COPY --from=cartesi/machine-emulator@sha256:02fede36987b5eb5cc698f9fe281eb1ef2c56cd07cdbf982a4401095ffe0129b /usr/local/lib/lua /usr/local/lib/lua
 COPY --from=cartesi/machine-emulator@sha256:02fede36987b5eb5cc698f9fe281eb1ef2c56cd07cdbf982a4401095ffe0129b /usr/local/share/lua /usr/local/share/lua
@@ -60,7 +60,7 @@ RUN \
 
 COPY --from=build /replicate/image.ext2 /image.ext2
 RUN /opt/cartesi/bin/cartesi-machine --append-rom-bootargs="loglevel=8 init=/debootstrap/bootstrap" --flash-drive=label:root,filename:/image.ext2,shared --ram-length=2Gi
-RUN sha256sum /image.ext2
+
 RUN apt-get update && apt-get install -y e2tools
 COPY extract-tar /tool-image/install
 
@@ -68,25 +68,84 @@ RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /tool-image -b 20971
 RUN /opt/cartesi/bin/cartesi-machine --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image.img,shared --ram-length=2Gi
 RUN e2cp tool-image.img:/rootfs.tar /rootfs.tar
 RUN mkdir -p /rootfs && cd /rootfs && tar xf /rootfs.tar
-#RUN cd / && wget -O repro-get https://github.com/reproducible-containers/repro-get/releases/download/v0.4.0/repro-get-v0.4.0.linux-riscv64 && chmod +x repro-get
 
 FROM scratch AS riscv-base
 COPY --from=debootstrap /rootfs /
 FROM riscv-base AS riscv-install
-RUN apt-get update && apt-get install -y build-essential
-RUN repro-get hash generate --dedupe=/etc/repro-get/SHA256SUMS-riscv64 > /etc/repro-get/SHA25SUMS-riscv64-new
-RUN repro-get download /etc/repro-get/SHA25SUMS-riscv64-new
+RUN apt-get update && apt-get install -y build-essential git
+RUN mkdir -p /etc/repro-get
+RUN repro-get hash generate --dedupe=/etc/repro-get/SHA256SUMS-riscv64 > /etc/repro-get/SHA256SUMS-riscv64-new
+RUN repro-get download /etc/repro-get/SHA256SUMS-riscv64-new
 FROM debootstrap AS pkg-install
 COPY install-pkgs /tool-image/install
 COPY --from=riscv-install /var/cache/repro-get /tool-image/repro-get-cache
-COPY --from=riscv-install /etc/repro-get/SHA25SUMS-riscv64-new /tool-image/SHA25SUMS-riscv64-new
+COPY --from=riscv-install /etc/repro-get/SHA256SUMS-riscv64-new /tool-image/SHA256SUMS-riscv64-new
 
 RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /tool-image -b 2097152 /tool-image.img
 RUN /opt/cartesi/bin/cartesi-machine --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
+RUN rm -rf /tool-image /tool-image.img
+
+# ---- install rust here
+RUN wget https://static.rust-lang.org/dist/rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz
+RUN echo "fcb67647b764669f3b4e61235fbdc0eca287229adf9aed8c41ce20ffaad4a3ea  rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz" | sha256sum -c -
+
+RUN mkdir -p /tool-image
+RUN echo '#!/bin/sh\n\
+tar -xzf /mnt/rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz\n\
+sh /rust-1.71.1-riscv64gc-unknown-linux-gnu/install.sh\n\
+rm -rf /rust-1.71.1-riscv64gc-unknown-linux-gnu/' > /tool-image/install \
+    && chmod +x /tool-image/install
+RUN mv rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz /tool-image/
+
+RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /tool-image -b 2097152 /install-disk.img
+
+RUN /opt/cartesi/bin/cartesi-machine \
+    --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" \
+    --flash-drive="label:root,filename:/image.ext2",shared \
+    --flash-drive="label:install,filename:/install-disk.img" \
+    --ram-length=2Gi | tee /log
+
 RUN sha256sum /image.ext2
-#FROM riscv-base AS foo
-#COPY --from=riscv-install /var/cache/repro-get /var/cache/repro-get
-#COPY --from=riscv-install /etc/repro-get/SHA25SUMS-riscv64-new /etc/repro-get/SHA25SUMS-riscv64-new
-#RUN repro-get install /etc/repro-get/SHA25SUMS-riscv64-new
-FROM busybox
-COPY --from=debootstrap /image.ext2 /image.ext2
+
+FROM rust:1.58 AS rust-build
+
+RUN mkdir -p /tool-image
+
+RUN apt-get update && apt-get install -y git
+
+RUN git clone --bare https://github.com/nyakiomaina/reproducible-builds.git /tool-image/bare-repo && \
+    ls -al /tool-image
+
+RUN git clone /tool-image/bare-repo /my-workspace && \
+    cd /my-workspace && \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN cd /my-workspace && cargo vendor
+
+#transfer everything to the /tool-image directory
+RUN cp -R /my-workspace/vendor /tool-image/vendored-sources && \
+    echo '#!/bin/sh\nexport PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin\n\
+git clone /mnt/bare-repo /build-workspace\n\
+mkdir -p /build-workspace/.cargo && \
+echo "[source.crates-io]" > /build-workspace/.cargo/config.toml && \
+echo "replace-with = \"vendored-sources\"" >> /build-workspace/.cargo/config.toml && \
+echo "" >> /build-workspace/.cargo/config.toml && \
+echo "[source.vendored-sources]" >> /build-workspace/.cargo/config.toml && \
+echo "directory = \"vendor\"" >> /build-workspace/.cargo/config.toml && \
+cp -R /mnt/vendored-sources/* /build-workspace/vendor/\n\
+echo building\n\
+cd /build-workspace && cargo build --release --verbose && echo Done' > /tool-image/install &&\
+    chmod +x /tool-image/install
+FROM pkg-install
+
+COPY --from=rust-build /tool-image /tool-image
+
+RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /tool-image -b 2097152 /install-disk.img
+
+RUN /opt/cartesi/bin/cartesi-machine \
+    --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" \
+    --flash-drive="label:root,filename:/image.ext2" \
+    --flash-drive="label:install,filename:/install-disk.img" \
+    --ram-length=2Gi | tee /log

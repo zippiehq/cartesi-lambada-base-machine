@@ -1,4 +1,4 @@
 #!/bin/sh
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
-repro-get --cache=/mnt/repro-get-cache install /mnt/SHA25SUMS-riscv64-new
+repro-get --cache=/mnt/repro-get-cache install /mnt/SHA256SUMS-riscv64-new
