@@ -29,6 +29,7 @@ RUN find "/replicate/release" \
 	-newermt "@1689943775" \
 	-exec touch --no-dereference --date="@1689943775" '{}' +
 RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /replicate/release -B 4096 -b 4194304 /replicate/image.ext2
+RUN rm -rf /replicate/release
 RUN sha256sum /replicate/image.ext2
 
 FROM ubuntu:22.04 AS debootstrap
@@ -68,11 +69,12 @@ RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /tool-image -b 20971
 RUN /opt/cartesi/bin/cartesi-machine --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image.img,shared --ram-length=2Gi
 RUN e2cp tool-image.img:/rootfs.tar /rootfs.tar
 RUN mkdir -p /rootfs && cd /rootfs && tar xf /rootfs.tar
+RUN rm -f /rootfs.tar
 
 FROM scratch AS riscv-base
 COPY --from=debootstrap /rootfs /
 FROM riscv-base AS riscv-install
-RUN apt-get update && apt-get install -y build-essential git
+RUN apt-get update && apt-get install -y build-essential git strace
 RUN mkdir -p /etc/repro-get
 RUN repro-get hash generate --dedupe=/etc/repro-get/SHA256SUMS-riscv64 > /etc/repro-get/SHA256SUMS-riscv64-new
 RUN repro-get download /etc/repro-get/SHA256SUMS-riscv64-new
@@ -86,22 +88,25 @@ RUN /opt/cartesi/bin/cartesi-machine --append-rom-bootargs="loglevel=8 init=/sbi
 RUN rm -rf /tool-image /tool-image.img
 
 # ---- install rust here
+RUN wget https://github.com/cartesi/machine-emulator-tools/releases/download/v0.12.0/machine-emulator-tools-v0.12.0.deb
 RUN wget https://static.rust-lang.org/dist/rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz
 RUN echo "fcb67647b764669f3b4e61235fbdc0eca287229adf9aed8c41ce20ffaad4a3ea  rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz" | sha256sum -c -
 
 RUN mkdir -p /tool-image
 RUN echo '#!/bin/sh\n\
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin\n\
+dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb\n\
 tar -xzf /mnt/rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz\n\
 sh /rust-1.71.1-riscv64gc-unknown-linux-gnu/install.sh\n\
 rm -rf /rust-1.71.1-riscv64gc-unknown-linux-gnu/' > /tool-image/install \
     && chmod +x /tool-image/install
 RUN mv rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz /tool-image/
-
+RUN mv machine-emulator-tools-v0.12.0.deb /tool-image
 RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /tool-image -b 2097152 /install-disk.img
-
+RUN rm -rf /tool-image
 RUN /opt/cartesi/bin/cartesi-machine \
     --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" \
-    --flash-drive="label:root,filename:/image.ext2",shared \
+    --flash-drive="label:root,filename:/image.ext2,shared" \
     --flash-drive="label:install,filename:/install-disk.img" \
     --ram-length=2Gi | tee /log
 
@@ -111,14 +116,14 @@ FROM rust:1.58 AS rust-build
 
 RUN mkdir -p /tool-image
 
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git=1:2.30.2-1+deb11u2 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --bare https://github.com/nyakiomaina/reproducible-builds.git /tool-image/bare-repo && \
     ls -al /tool-image
 
 RUN git clone /tool-image/bare-repo /my-workspace && \
     cd /my-workspace && \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.58.0 -y
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 
@@ -127,6 +132,7 @@ RUN cd /my-workspace && cargo vendor
 #transfer everything to the /tool-image directory
 RUN cp -R /my-workspace/vendor /tool-image/vendored-sources && \
     echo '#!/bin/sh\nexport PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin\n\
+/opt/cartesi/bin/rndaddentropy < /opt/cartesi/bin/rndaddentropy\n\
 git clone /mnt/bare-repo /build-workspace\n\
 mkdir -p /build-workspace/.cargo && \
 echo "[source.crates-io]" > /build-workspace/.cargo/config.toml && \
@@ -134,18 +140,22 @@ echo "replace-with = \"vendored-sources\"" >> /build-workspace/.cargo/config.tom
 echo "" >> /build-workspace/.cargo/config.toml && \
 echo "[source.vendored-sources]" >> /build-workspace/.cargo/config.toml && \
 echo "directory = \"vendor\"" >> /build-workspace/.cargo/config.toml && \
-cp -R /mnt/vendored-sources/* /build-workspace/vendor/\n\
+mkdir -p /build-workspace/vendor\n\
+cp -Rv /mnt/vendored-sources/* /build-workspace/vendor\n\
 echo building\n\
-cd /build-workspace && cargo build --release --verbose && echo Done' > /tool-image/install &&\
+cd /build-workspace && cargo build --release --locked --verbose && echo Done' > /tool-image/install &&\
     chmod +x /tool-image/install
 FROM pkg-install
 
 COPY --from=rust-build /tool-image /tool-image
 
 RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /tool-image -b 2097152 /install-disk.img
+RUN rm -rf /tool-image
 
 RUN /opt/cartesi/bin/cartesi-machine \
     --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" \
-    --flash-drive="label:root,filename:/image.ext2" \
+    --flash-drive="label:root,filename:/image.ext2,shared" \
     --flash-drive="label:install,filename:/install-disk.img" \
     --ram-length=2Gi | tee /log
+
+RUN sha256sum /image.ext2
