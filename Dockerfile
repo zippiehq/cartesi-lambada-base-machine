@@ -121,6 +121,8 @@ RUN apt-get update && apt-get install -y git=1:2.30.2-1+deb11u2 && apt-get clean
 RUN git clone --bare https://github.com/nyakiomaina/reproducible-builds.git /tool-image/bare-repo && \
     ls -al /tool-image
 
+RUN find /tool-image/bare-repo -exec touch --no-dereference --date="@1689943775" '{}' +
+
 RUN git clone /tool-image/bare-repo /my-workspace && \
     cd /my-workspace && \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain 1.58.0 -y
@@ -145,6 +147,9 @@ cp -Rv /mnt/vendored-sources/* /build-workspace/vendor\n\
 echo building\n\
 cd /build-workspace && cargo build --release --locked --verbose && echo Done' > /tool-image/install &&\
     chmod +x /tool-image/install
+
+RUN find /tool-image -exec touch --no-dereference --date="@1689943775" '{}' +
+
 FROM pkg-install
 
 COPY --from=rust-build /tool-image /tool-image
