@@ -1,4 +1,8 @@
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS genext2fs-build
+
+ENV TZ=UTC
+ENV LC_ALL=C
+ENV SOURCE_DATE_EPOCH=1689943775
 RUN apt-get update && apt-get install -y git
 RUN git clone https://github.com/cartesi/genext2fs /genext2fs && cd /genext2fs && git checkout v1.5.2 && ./make-debian
 
