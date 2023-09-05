@@ -106,6 +106,7 @@ rm -rf /rust-1.71.1-riscv64gc-unknown-linux-gnu/' > /tool-image/install \
     && chmod +x /tool-image/install
 RUN mv rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz /tool-image/
 RUN mv machine-emulator-tools-v0.12.0.deb /tool-image
+RUN find /tool-image -exec touch --no-dereference --date="@1689943775" '{}' +
 RUN SOURCE_DATE_EPOCH=1689943775 genext2fs -N 1638400 -f -d /tool-image -b 2097152 /install-disk.img
 RUN rm -rf /tool-image
 RUN /opt/cartesi/bin/cartesi-machine \
