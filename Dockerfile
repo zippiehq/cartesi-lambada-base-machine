@@ -80,6 +80,10 @@ RUN chmod 755 /tool-image/install
 
 COPY --from=riscv-base /var/cache/repro-get /tool-image/repro-get-cache
 COPY --from=riscv-base /etc/repro-get/SHA256SUMS-riscv64-new /tool-image/SHA256SUMS-riscv64-new
+RUN wget https://github.com/cartesi/machine-emulator-tools/releases/download/v0.12.0/machine-emulator-tools-v0.12.0.deb && \
+     echo "901e8343f7f2fe68555eb9f523f81430aa41487f9925ac6947e8244432396b3a machine-emulator-tools-v0.12.0.deb" | sha256sum -c -
+RUN mv machine-emulator-tools-v0.12.0.deb /tool-image
+
 RUN find /tool-image -exec touch --no-dereference --date="@1689943775" '{}' +
 RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1689943775 genext2fs -z -v -v -N 1638400 -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image.img 2>&1 > /tool-image.gen
 RUN sha256sum /tool-image.img
@@ -92,21 +96,17 @@ RUN rm -rf /tool-image.img
 RUN sha256sum /image.ext2
 
 FROM build AS rust-image-prep
-RUN wget https://github.com/cartesi/machine-emulator-tools/releases/download/v0.12.0/machine-emulator-tools-v0.12.0.deb && \
-     echo "901e8343f7f2fe68555eb9f523f81430aa41487f9925ac6947e8244432396b3a machine-emulator-tools-v0.12.0.deb" | sha256sum -c -
 RUN wget https://static.rust-lang.org/dist/rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz && \
      echo "fcb67647b764669f3b4e61235fbdc0eca287229adf9aed8c41ce20ffaad4a3ea  rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz" | sha256sum -c -
 
  RUN mkdir -p /tool-image
  RUN echo '#!/bin/sh\n\
 export PATH=/bin:/usr/bin:/sbin:/usr/sbin\n\
-dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb\n\
 tar -xzf /mnt/rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz\n\
 sh /rust-1.71.1-riscv64gc-unknown-linux-gnu/install.sh\n\
 rm -rf /rust-1.71.1-riscv64gc-unknown-linux-gnu/' > /tool-image/install \
      && chmod +x /tool-image/install
 RUN mv rust-1.71.1-riscv64gc-unknown-linux-gnu.tar.gz /tool-image/
-RUN mv machine-emulator-tools-v0.12.0.deb /tool-image
 RUN find /tool-image -exec touch --no-dereference --date="@1689943775" '{}' +
 RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image
 RUN HOSTNAME=linux SOURCE_DATE_EPOCH=1689943775 genext2fs -z -v -v -N 1638400 -f -a /tool-image.tar -B 4096 -b 2097152 /install-disk.img 2>&1 > /tool-image.gen

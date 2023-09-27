@@ -1,4 +1,7 @@
 #!/bin/sh
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
+dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb
+/opt/cartesi/bin/rndaddentropy < /opt/cartesi/bin/rndaddentropy
+echo -n "root:cartesi" | chpasswd
 repro-get --cache=/mnt/repro-get-cache install /mnt/SHA256SUMS-riscv64-new
