@@ -2,6 +2,10 @@
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
 dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb
+date -s '2023-09-28 00:00:00'
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/bin/rndaddentropy
+
 echo -n "root:cartesi" | chpasswd
-repro-get --cache=/mnt/repro-get-cache install /mnt/SHA256SUMS-riscv64-new
+printf "deb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse" > /etc/apt/sources.list
+apt-get update
+apt-get install -y docker.io

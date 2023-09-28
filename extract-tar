@@ -1,2 +1,5 @@
 #!/bin/sh
+mke2fs /dev/mtdblock2
+mount /dev/mtdblock2 /mnt
 tar -pcSf /mnt/rootfs.tar --one-file-system /
+umount /mnt

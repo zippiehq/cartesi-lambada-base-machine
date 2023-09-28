@@ -2,8 +2,6 @@
 /debootstrap/debootstrap --second-stage
 PATH=/bin:/usr/bin:/sbin:/usr/sbin
 export PATH
-mkdir -p /etc/repro-get
-/sbin/repro-get hash generate > /etc/repro-get/SHA256SUMS-riscv64
 rm -rf /debootstrap
 mount -f -o remount,ro /
 sync

@@ -1,0 +1,12 @@
+#!/bin/bash
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+export PATH
+mkfs.ext2 /dev/mtdblock1
+mkdir -p /dev/tmp
+mount -t tmpfs tmpfs /dev/tmp 
+mkdir -p /dev/tmp/mnt
+mount /dev/mtdblock1 /dev/tmp/mnt
+cp -ax / /dev/tmp/mnt
+umount /dev/tmp/mnt
+sync
+
