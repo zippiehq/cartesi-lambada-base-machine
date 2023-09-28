@@ -1,9 +1,16 @@
 #!/bin/sh
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
+export DEBIAN_FRONTEND="noninteractive"
 dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb
 date -s '2023-09-28 00:00:00'
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/bin/rndaddentropy
+cat > /opt/cartesi/bin/preinit << EOF
+#!/bin/sh
+/opt/cartesi/bin/rndaddentropy < /opt/cartesi/var/run/random-seed
+exec /sbin/init
+EOF
+chmod +x /opt/cartesi/bin/preinit
 
 echo -n "root:cartesi" | chpasswd
 printf "deb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse" > /etc/apt/sources.list
