@@ -10,7 +10,65 @@ cat > /opt/cartesi/bin/preinit << EOF
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/var/run/random-seed
 exec /sbin/init
 EOF
+mkdir -p /app
 chmod +x /opt/cartesi/bin/preinit
+cat > /opt/cartesi/bin/yield-and-install << EOF
+#!/bin/bash
+{ 
+	echo "Yielding to get app"
+	/opt/cartesi/bin/yield manual progress 0
+	echo "Back from yielding"
+	mount /dev/mtdblock1 /app
+	RET=$?
+	if [ $RET == 0 ]; then
+		echo "Mounted app"
+		if [ ! -e /app/init ]; then
+			echo "No init in app, dying"
+			halt -f
+			exit 0
+		fi
+		/app/init &
+		if [ ! -e /app/wait_for_healthcheck ]; then
+			echo "No wait_for_healthcheck in app, dying"
+			halt -f
+			exit 0
+		fi
+		
+		/app/wait_for_healthcheck
+		RET=$?
+		if [ $RET == 0 ]; then
+			echo "Healthcheck OK, yielding"
+		        /opt/cartesi/bin/yield manual progress 0
+		else
+			echo "Healthcheck wait failed, dying"
+			halt -f
+			exit 0
+		fi
+	else
+		echo "Failed to mount app, dying"
+		halt -f
+		exit 0
+	fi
+} 2>&1 > /dev/hvc0
+EOF
+
+chmod +x /opt/cartesi/bin/yield-and-install
+
+cat > /etc/systemd/system/yield-and-install.service << EOF
+[Unit]
+Description=First yield
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/cartesi/bin/yield-and-install
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable yield-and-install.service
 
 echo -n "root:cartesi" | chpasswd
 printf "deb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse" > /etc/apt/sources.list

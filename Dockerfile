@@ -1,22 +1,22 @@
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS genext2fs-build
+RUN apt-get update && apt-get install -y ca-certificates
+RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
 RUN apt-get update && apt-get install -y git=1:2.34.1-1ubuntu1.10
 RUN git clone https://github.com/cartesi/genext2fs /genext2fs && cd /genext2fs && git checkout v1.5.2 && ./make-debian
 
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS build
+RUN apt-get update && apt-get install -y ca-certificates
+RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
+RUN apt-get update && apt-get install -y debootstrap=1.0.126+nmu1ubuntu0.5 patch=2.7.6-7build2 libarchive13 e2tools
 ENV TZ=UTC
 ENV LC_ALL=C
 ENV LANG=C.UTF-8
 ENV LC_CTYPE=C.UTF-8
-ENV SOURCE_DATE_EPOCH=1689943775
+ENV SOURCE_DATE_EPOCH=1695938400
 
-RUN apt-get update && apt-get install -y debootstrap=1.0.126+nmu1ubuntu0.5 patch=2.7.6-7build2 libarchive13 e2tools
 COPY --from=genext2fs-build /genext2fs/genext2fs.deb /genext2fs.deb
 RUN dpkg -i /genext2fs.deb
-COPY debootstrap.patch /debootstrap.patch
-RUN patch -p1 < /debootstrap.patch
-RUN rm -rf /debootstrap.patch*
-COPY InRelease /replicate/InRelease
-RUN LOCAL_INRELEASE_PATH=/replicate/InRelease debootstrap --include=wget --foreign --arch riscv64 jammy /replicate/release https://snapshot.ubuntu.com/ubuntu/20230928T000000Z
+RUN debootstrap --include=wget --foreign --arch riscv64 jammy /replicate/release https://snapshot.ubuntu.com/ubuntu/20230928T000000Z
 RUN rm -rf /replicate/release/debootstrap/debootstrap.log
 RUN touch /replicate/release/debootstrap/debootstrap.log
 RUN echo -n "ubuntu" > /replicate/release/etc/hostname
@@ -32,16 +32,16 @@ COPY additional /replicate/release/sbin/install-from-mtdblock1
 RUN chmod 755 /replicate/release/sbin/install-from-mtdblock1
 
 RUN find "/replicate/release" \
-	-newermt "@1689943775" \
-	-exec touch --no-dereference --date="@1689943775" '{}' +
+	-newermt "@1695938400" \
+	-exec touch --no-dereference --date="@1695938400" '{}' +
 RUN tar --sort=name -C /replicate/release -cf - . > /replicate/release.tar
-RUN HOSTNAME=linux SOURCE_DATE_EPOCH=1689943775 genext2fs -z -v -v -f -a /replicate/release.tar -B 4096 /replicate/source.ext2 2>&1 > /tool-image.gen
+RUN HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /replicate/release.tar -B 4096 /replicate/source.ext2 2>&1 > /tool-image.gen
 RUN ls -al /replicate/source.ext2
 RUN rm -rf /replicate/release /replicate/release.tar
 
 COPY extract-tar /tool-image/install
 RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image
-RUN HOSTNAME=linux SOURCE_DATE_EPOCH=1689943775 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 /extract-rootfs.img 2>&1 > /tool-image.gen
+RUN HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 /extract-rootfs.img 2>&1 > /tool-image.gen
 RUN rm /tool-image.tar
 
 COPY --from=cartesi/linux-kernel:0.16.0 /opt/riscv/kernel/artifacts/linux-5.15.63-ctsi-2.bin /usr/share/cartesi-machine/images/linux.bin
@@ -58,8 +58,6 @@ RUN truncate -s 8G /image.ext2
 RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/debootstrap/copy" --flash-drive=label:root,filename:/source.ext2 --flash-drive=label:dest,filename:/image.ext2,shared --ram-length=2Gi
 # actually debootstrap
 RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/debootstrap/bootstrap" --flash-drive=label:root,filename:/image.ext2,shared --ram-length=2Gi
-
-RUN sha256sum /image.ext2
 
 FROM debootstrap-image AS extract-rootfs-image
 COPY --from=build /extract-rootfs.img /extract-rootfs.img
@@ -87,9 +85,8 @@ RUN wget https://github.com/cartesi/machine-emulator-tools/releases/download/v0.
      echo "901e8343f7f2fe68555eb9f523f81430aa41487f9925ac6947e8244432396b3a machine-emulator-tools-v0.12.0.deb" | sha256sum -c -
 RUN mv machine-emulator-tools-v0.12.0.deb /tool-image
 
-RUN find /tool-image -exec touch --no-dereference --date="@1689943775" '{}' +
-RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1689943775 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image.img 2>&1 > /tool-image.gen
-RUN sha256sum /tool-image.img
+RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
+RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image.img 2>&1 > /tool-image.gen
 
 FROM debootstrap-image AS aptget-image
 COPY --from=aptget-setup /tool-image.img /tool-image.img
