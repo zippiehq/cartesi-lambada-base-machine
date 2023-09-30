@@ -15,37 +15,44 @@ chmod +x /opt/cartesi/bin/preinit
 cat > /opt/cartesi/bin/yield-and-install << EOF
 #!/bin/bash
 { 
-	echo "Yielding to get app"
+	if [ ! -e /dev/yield ]; then
+		echo "No /dev/yield, exiting"
+		exit 0
+	fi
+	echo "yield-and-install: yielding to get app"
 	/opt/cartesi/bin/yield manual progress 0
-	echo "Back from yielding"
-	mount /dev/mtdblock1 /app
-	RET=$?
-	if [ $RET == 0 ]; then
-		echo "Mounted app"
+	echo "yield-and-install: back"
+	blockdev --flushbufs /dev/mtdblock1
+	mount -v /dev/mtdblock1 /app 2>&1
+	if [ \$? -eq 0 ]; then
+		echo "yield-and-install: mounted app"
 		if [ ! -e /app/init ]; then
-			echo "No init in app, dying"
+			echo "yield-and-install: no init in app, dying"
+			dmesg
 			halt -f
 			exit 0
 		fi
 		/app/init &
 		if [ ! -e /app/wait_for_healthcheck ]; then
-			echo "No wait_for_healthcheck in app, dying"
+			echo "yield-and-install: no wait_for_healthcheck in app, dying"
+			dmesg
 			halt -f
 			exit 0
 		fi
 		
 		/app/wait_for_healthcheck
-		RET=$?
-		if [ $RET == 0 ]; then
-			echo "Healthcheck OK, yielding"
+		if [ \$? -eq 0 ]; then
+			echo "yield-and-install: healthcheck OK, yielding"
 		        /opt/cartesi/bin/yield manual progress 0
 		else
-			echo "Healthcheck wait failed, dying"
+			echo "yield-and-install: healthcheck wait failed, dying"
+			dmesg
 			halt -f
 			exit 0
 		fi
 	else
-		echo "Failed to mount app, dying"
+		echo "yield-and-install: failed to mount app, dying"
+		dmesg
 		halt -f
 		exit 0
 	fi
