@@ -10,8 +10,13 @@ cat > /opt/cartesi/bin/preinit << EOF
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/var/run/random-seed
 exec /sbin/init
 EOF
-mkdir -p /app
+mkdir -p /opt/cartesi/dapp
 chmod +x /opt/cartesi/bin/preinit
+cat > /opt/cartesi/bin/run-docker.sh << EOF
+#!/bin/bash
+docker run --network host dapp:1.0
+EOF
+chmod +x /opt/cartesi/bin/run-docker.sh
 cat > /opt/cartesi/bin/yield-and-install << EOF
 #!/bin/bash
 { 
@@ -19,39 +24,34 @@ cat > /opt/cartesi/bin/yield-and-install << EOF
 		echo "No /dev/yield, exiting"
 		exit 0
 	fi
-	echo "yield-and-install: yielding to get app"
+	echo "yield-and-install: yielding to get dapp"
 	/opt/cartesi/bin/yield manual progress 0
 	echo "yield-and-install: back"
 	blockdev --flushbufs /dev/mtdblock1
-	mount -v /dev/mtdblock1 /app 2>&1
+	mount -v /dev/mtdblock1 /opt/cartesi/dapp 2>&1
 	if [ \$? -eq 0 ]; then
-		echo "yield-and-install: mounted app"
-		if [ ! -e /app/init ]; then
-			echo "yield-and-install: no init in app, dying"
+		echo "yield-and-install: mounted dapp"
+		if [ -e /opt/cartesi/dapp/docker-container.tar ]; then
+			echo "yield-and-install: running dapp with docker"
+			docker load --input /opt/cartesi/dapp/docker-container.tar
+			/opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-docker.sh
 			dmesg
 			halt -f
 			exit 0
 		fi
-		/app/init &
-		if [ ! -e /app/wait_for_healthcheck ]; then
-			echo "yield-and-install: no wait_for_healthcheck in app, dying"
+		if [ ! -e /opt/cartesi/dapp/entrypoint.sh ]; then
+			echo "yield-and-install: no init in dapp, dying"
 			dmesg
 			halt -f
 			exit 0
 		fi
-		
-		/app/wait_for_healthcheck
-		if [ \$? -eq 0 ]; then
-			echo "yield-and-install: healthcheck OK, yielding"
-		        /opt/cartesi/bin/yield manual progress 0
-		else
-			echo "yield-and-install: healthcheck wait failed, dying"
-			dmesg
-			halt -f
-			exit 0
-		fi
+		/opt/cartesi/dapp/entrypoint.sh
+		echo "entrypoint exited with \$? status"
+		dmesg
+		halt -f
+		exit 0
 	else
-		echo "yield-and-install: failed to mount app, dying"
+		echo "yield-and-install: failed to mount dapp, dying"
 		dmesg
 		halt -f
 		exit 0
@@ -80,4 +80,5 @@ systemctl enable yield-and-install.service
 echo -n "root:cartesi" | chpasswd
 printf "deb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse" > /etc/apt/sources.list
 apt-get update
-apt-get install -y docker.io
+apt-get install -y docker.io curl busybox
+
