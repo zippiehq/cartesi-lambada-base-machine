@@ -4,6 +4,20 @@ RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/202309
 RUN apt-get update && apt-get install -y git=1:2.34.1-1ubuntu1.10
 RUN git clone https://github.com/cartesi/genext2fs /genext2fs && cd /genext2fs && git checkout v1.5.2 && ./make-debian
 
+FROM golang:1.21 as kubo-build
+RUN apt-get update && apt-get install -y llvm
+
+WORKDIR /app
+
+RUN git clone https://github.com/ipfs/kubo -b v0.23.0
+
+WORKDIR /app/kubo
+RUN go mod download
+COPY ./sys_linux_riscv64.go /go/pkg/mod/github.com/marten-seemann/tcp\@v0.0.0-20210406111302-dfbc87cc63fd/sys_linux_riscv64.go
+RUN GOOS=linux GOARCH=riscv64 CGO_ENABLED=0 GOFLAGS="-ldflags=-s-w -trimpath" make nofuse
+RUN sha256sum /app/kubo/cmd/ipfs/ipfs
+RUN llvm-strip -s /app/kubo/cmd/ipfs/ipfs
+
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS build
 RUN apt-get update && apt-get install -y ca-certificates
 RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
@@ -72,19 +86,20 @@ FROM scratch AS riscv-base
 COPY --from=extracted-rootfs /rootfs /
 RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
 RUN mkdir -p /mirror && cd /mirror && apt-get update --print-uris | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
-RUN cd /mirror && apt-get update && apt-get install -qq --print-uris docker.io curl busybox | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
+RUN cd /mirror && apt-get update && apt-get install -qq --print-uris docker.io curl busybox python3-requests | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
 
 FROM build AS aptget-setup
 RUN rm -rf /tool-image
 COPY install-pkgs /tool-image/install
 RUN chmod 755 /tool-image/install
-
+COPY --from=kubo-build /app/kubo/cmd/ipfs/ipfs /tool-image/ipfs
+RUN chmod 755 /tool-image/ipfs
 COPY --from=riscv-base /mirror /tool-image/mirror
 
-RUN wget https://github.com/cartesi/machine-emulator-tools/releases/download/v0.12.0/machine-emulator-tools-v0.12.0.deb && \
-     echo "901e8343f7f2fe68555eb9f523f81430aa41487f9925ac6947e8244432396b3a machine-emulator-tools-v0.12.0.deb" | sha256sum -c -
-RUN mv machine-emulator-tools-v0.12.0.deb /tool-image
-
+#RUN wget https://github.com/cartesi/machine-emulator-tools/releases/download/v0.12.0/machine-emulator-tools-v0.12.0.deb && \
+#     echo "901e8343f7f2fe68555eb9f523f81430aa41487f9925ac6947e8244432396b3a machine-emulator-tools-v0.12.0.deb" | sha256sum -c -
+#RUN mv machine-emulator-tools-v0.12.0.deb /tool-image
+COPY ./machine-emulator-tools-v0.12.0.deb /tool-image/machine-emulator-tools-v0.12.0.deb
 RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
 RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image.img 2>&1 > /tool-image.gen
 

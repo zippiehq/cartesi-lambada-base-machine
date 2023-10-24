@@ -24,9 +24,10 @@ cat > /opt/cartesi/bin/yield-and-install << EOF
 		echo "No /dev/yield, exiting"
 		exit 0
 	fi
-	echo "yield-and-install: yielding to get dapp"
-	/opt/cartesi/bin/yield manual progress 0
-	echo "yield-and-install: back"
+#temporarily disabled -cvm
+#	echo "yield-and-install: yielding to get dapp"
+#	/opt/cartesi/bin/yield manual progress 0
+#	echo "yield-and-install: back"
 	blockdev --flushbufs /dev/mtdblock1
 	mount -v /dev/mtdblock1 /opt/cartesi/dapp 2>&1
 	if [ \$? -eq 0 ]; then
@@ -71,14 +72,18 @@ Requires=docker.service
 Type=oneshot
 ExecStart=/opt/cartesi/bin/yield-and-install
 RemainAfterExit=yes
-
+StandardInput=console
+StandardOutput=journal+console
+StandardError=journal+console
 [Install]
 WantedBy=multi-user.target
 EOF
 systemctl enable yield-and-install.service
+cp /mnt/ipfs /usr/bin/ipfs
+chmod a+x /usr/bin/ipfs
+IPFS_PATH=/opt/ipfs /usr/bin/ipfs init --profile=server,flatfs,lowpower -e
 
 echo -n "root:cartesi" | chpasswd
 printf "deb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse" > /etc/apt/sources.list
 apt-get update
-apt-get install -y docker.io curl busybox
-
+apt-get install -y docker.io curl busybox python3-requests
