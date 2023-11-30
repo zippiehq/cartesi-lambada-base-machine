@@ -14,7 +14,33 @@ mkdir -p /opt/cartesi/dapp
 chmod +x /opt/cartesi/bin/preinit
 cat > /opt/cartesi/bin/run-docker.sh << EOF
 #!/bin/bash
+export IPFS_PATH=/opt/ipfs
+export HTTP_DATASTORE_URL=http://127.0.0.1:5004/ipfs
+export CACHE_DIR=/opt/rollup-cache
+export STORE_DIR=/opt/rollup-store
+export IO_DEVICE=/dev/mtdblock1
+mkdir -p /opt/rollup-store
+mkdir -p /opt/rollup-cache
+#curl -X POST -d '{"status":"accept"}' -H "Content-Type: application/json" http://127.0.0.1:5004/finish
+/usr/bin/ipfs init /etc/ipfs-config
+/usr/bin/ipfs daemon --offline &
+echo "Waiting for IPFS"
+IPFS_HOST="127.0.0.1"
+IPFS_PORT="5001"
+
+while true; do
+	nc -z "\$IPFS_HOST" "\$IPFS_PORT"
+        RET=\$?
+        echo \$RET
+        if [ x\$RET = x0 ]; then
+           break
+        fi
+        sleep 1
+done
+echo "IPFS up"
+
 docker run --network host dapp:1.0
+
 EOF
 chmod +x /opt/cartesi/bin/run-docker.sh
 cat > /opt/cartesi/bin/yield-and-install << EOF
@@ -24,39 +50,18 @@ cat > /opt/cartesi/bin/yield-and-install << EOF
 		echo "No /dev/yield, exiting"
 		exit 0
 	fi
-#temporarily disabled -cvm
-#	echo "yield-and-install: yielding to get dapp"
-#	/opt/cartesi/bin/yield manual progress 0
-#	echo "yield-and-install: back"
-	blockdev --flushbufs /dev/mtdblock1
+	mkdir -p /opt/rollup-cache
+	mkdir -p /opt/rollup-store
+	export CACHE_DIR=/opt/rollup-cache
+	export STORE_DIR=/opt/rollup-store
+	export IO_DEVICE=/dev/mtdblock1
+	CACHE_DIR=/opt/rollup-cache /opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-docker.sh
+	
 	mount -v /dev/mtdblock1 /opt/cartesi/dapp 2>&1
-	if [ \$? -eq 0 ]; then
-		echo "yield-and-install: mounted dapp"
-		if [ -e /opt/cartesi/dapp/docker-container.tar ]; then
-			echo "yield-and-install: running dapp with docker"
-			docker load --input /opt/cartesi/dapp/docker-container.tar
-			/opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-docker.sh
-			dmesg
-			halt -f
-			exit 0
-		fi
-		if [ ! -e /opt/cartesi/dapp/entrypoint.sh ]; then
-			echo "yield-and-install: no init in dapp, dying"
-			dmesg
-			halt -f
-			exit 0
-		fi
-		/opt/cartesi/dapp/entrypoint.sh
-		echo "entrypoint exited with \$? status"
-		dmesg
-		halt -f
-		exit 0
-	else
-		echo "yield-and-install: failed to mount dapp, dying"
-		dmesg
-		halt -f
-		exit 0
-	fi
+	echo "entrypoint exited with \$? status"
+	dmesg
+	halt -f
+	exit 0
 } 2>&1 > /dev/hvc0
 EOF
 
@@ -81,9 +86,9 @@ EOF
 systemctl enable yield-and-install.service
 cp /mnt/ipfs /usr/bin/ipfs
 chmod a+x /usr/bin/ipfs
-IPFS_PATH=/opt/ipfs /usr/bin/ipfs init --profile=server,flatfs,lowpower -e
+cp /mnt/ipfs-config /etc/ipfs-config
 
 echo -n "root:cartesi" | chpasswd
 printf "deb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse" > /etc/apt/sources.list
 apt-get update
-apt-get install -y docker.io curl busybox python3-requests
+apt-get install -y jq docker.io curl busybox python3-requests

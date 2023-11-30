@@ -1,7 +1,7 @@
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS genext2fs-build
 RUN apt-get update && apt-get install -y ca-certificates
 RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
-RUN apt-get update && apt-get install -y git=1:2.34.1-1ubuntu1.10
+RUN apt-get update && apt-get install -y git
 RUN git clone https://github.com/cartesi/genext2fs /genext2fs && cd /genext2fs && git checkout v1.5.2 && ./make-debian
 
 FROM golang:1.21 as kubo-build
@@ -9,19 +9,19 @@ RUN apt-get update && apt-get install -y llvm
 
 WORKDIR /app
 
-RUN git clone https://github.com/ipfs/kubo -b v0.23.0
+RUN git clone https://github.com/zippiehq/cartesi-kubo -b ipfs-cartesi kubo
 
 WORKDIR /app/kubo
 RUN go mod download
 COPY ./sys_linux_riscv64.go /go/pkg/mod/github.com/marten-seemann/tcp\@v0.0.0-20210406111302-dfbc87cc63fd/sys_linux_riscv64.go
-RUN GOOS=linux GOARCH=riscv64 CGO_ENABLED=0 GOFLAGS="-ldflags=-s-w -trimpath" make nofuse
+RUN GOOS=linux GOARCH=riscv64 CGO_ENABLED=0 GOFLAGS="-ldflags=-s-w -trimpath" make nofuse IPFS_PLUGINS="ds_http"
 RUN sha256sum /app/kubo/cmd/ipfs/ipfs
 RUN llvm-strip -s /app/kubo/cmd/ipfs/ipfs
 
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS build
 RUN apt-get update && apt-get install -y ca-certificates
 RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
-RUN apt-get update && apt-get install -y debootstrap=1.0.126+nmu1ubuntu0.5 patch=2.7.6-7build2 libarchive13 e2tools
+RUN apt-get update && apt-get install -y debootstrap patch libarchive13 e2tools
 ENV TZ=UTC
 ENV LC_ALL=C
 ENV LANG=C.UTF-8
@@ -86,13 +86,15 @@ FROM scratch AS riscv-base
 COPY --from=extracted-rootfs /rootfs /
 RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
 RUN mkdir -p /mirror && cd /mirror && apt-get update --print-uris | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
-RUN cd /mirror && apt-get update && apt-get install -qq --print-uris docker.io curl busybox python3-requests | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
+RUN cd /mirror && apt-get update && apt-get install -qq --print-uris jq docker.io curl busybox python3-requests | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
 
 FROM build AS aptget-setup
 RUN rm -rf /tool-image
 COPY install-pkgs /tool-image/install
 RUN chmod 755 /tool-image/install
 COPY --from=kubo-build /app/kubo/cmd/ipfs/ipfs /tool-image/ipfs
+COPY ipfs-config /tool-image/ipfs-config
+RUN chmod 555 /tool-image/ipfs-config
 RUN chmod 755 /tool-image/ipfs
 COPY --from=riscv-base /mirror /tool-image/mirror
 
@@ -107,7 +109,7 @@ FROM debootstrap-image AS aptget-image
 COPY --from=aptget-setup /tool-image.img /tool-image.img
 RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
 RUN rm -rf /tool-image.img
-RUN sha256sum /image.ext2
+#RUN sha256sum /image.ext2
 
-FROM busybox
-COPY --from=aptget-image /image.ext2 /image.ext2
+#FROM busybox
+#COPY --from=aptget-image /image.ext2 /image.ext2
