@@ -1,0 +1,43 @@
+#!/bin/sh
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH
+export DEBIAN_FRONTEND="noninteractive"
+dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb
+
+cat > /opt/cartesi/bin/run-docker.sh << EOF
+#!/bin/bash
+export IPFS_PATH=/opt/ipfs
+export HTTP_DATASTORE_URL=http://127.0.0.1:5004/ipfs
+export CACHE_DIR=/opt/rollup-cache/
+export STORE_DIR=/opt/rollup-store/
+export IO_DEVICE=/dev/mtdblock1
+mkdir -p /opt/rollup-store
+mkdir -p /opt/rollup-cache
+/usr/bin/ipfs init /etc/ipfs-config
+/usr/bin/ipfs daemon --offline &
+echo "Waiting for IPFS"
+IPFS_HOST="127.0.0.1"
+IPFS_PORT="5001"
+
+while true; do
+	nc -z "\$IPFS_HOST" "\$IPFS_PORT"
+        RET=\$?
+        echo \$RET
+        if [ x\$RET = x0 ]; then
+           break
+        fi
+        sleep 1
+done
+echo "IPFS up"
+echo "Getting first tx, which would set CID of /app"
+curl http://127.0.0.1:5004/get_app > /dev/null
+echo "/app":
+ipfs files ls /app
+echo "/"
+ipfs files ls /
+ipfs files read /app/boot-script > /tmp/boot-script
+chmod +x /tmp/boot-script
+cat /tmp/boot-script
+/tmp/boot-script
+EOF
+chmod +x /opt/cartesi/bin/run-docker.sh

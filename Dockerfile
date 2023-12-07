@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y llvm
 
 WORKDIR /app
 
-RUN git clone https://github.com/zippiehq/cartesi-kubo -b ipfs-cartesi kubo
+RUN git clone https://github.com/zippiehq/cartesi-kubo -b ipfs-cartesi kubo && cd kubo && git checkout 7e60dfc7980b6202e910f684429160141da8ad62
 
 WORKDIR /app/kubo
 RUN go mod download
@@ -104,11 +104,19 @@ COPY --from=riscv-base /mirror /tool-image/mirror
 COPY ./machine-emulator-tools-v0.12.0.deb /tool-image/machine-emulator-tools-v0.12.0.deb
 RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
 RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image.img 2>&1 > /tool-image.gen
+COPY ./machine-emulator-tools-v0.12.0.deb.new /tool-image/machine-emulator-tools-v0.12.0.deb
+COPY ./install-pkgs-2 /tool-image/install
+RUN chmod 755 /tool-image/install
+RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
+RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image2.img 2>&1 > /tool-image.gen
 
 FROM debootstrap-image AS aptget-image
 COPY --from=aptget-setup /tool-image.img /tool-image.img
 RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
+COPY --from=aptget-setup /tool-image2.img /tool-image2.img
+RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image2.img --ram-length=2Gi
 RUN rm -rf /tool-image.img
+
 #RUN sha256sum /image.ext2
 
 #FROM busybox

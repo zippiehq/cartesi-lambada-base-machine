@@ -16,8 +16,8 @@ cat > /opt/cartesi/bin/run-docker.sh << EOF
 #!/bin/bash
 export IPFS_PATH=/opt/ipfs
 export HTTP_DATASTORE_URL=http://127.0.0.1:5004/ipfs
-export CACHE_DIR=/opt/rollup-cache
-export STORE_DIR=/opt/rollup-store
+export CACHE_DIR=/opt/rollup-cache/
+export STORE_DIR=/opt/rollup-store/
 export IO_DEVICE=/dev/mtdblock1
 mkdir -p /opt/rollup-store
 mkdir -p /opt/rollup-cache
@@ -52,8 +52,8 @@ cat > /opt/cartesi/bin/yield-and-install << EOF
 	fi
 	mkdir -p /opt/rollup-cache
 	mkdir -p /opt/rollup-store
-	export CACHE_DIR=/opt/rollup-cache
-	export STORE_DIR=/opt/rollup-store
+	export CACHE_DIR=/opt/rollup-cache/
+	export STORE_DIR=/opt/rollup-store/
 	export IO_DEVICE=/dev/mtdblock1
 	CACHE_DIR=/opt/rollup-cache /opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-docker.sh
 	
