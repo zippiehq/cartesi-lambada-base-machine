@@ -92,3 +92,5 @@ echo -n "root:cartesi" | chpasswd
 printf "deb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse" > /etc/apt/sources.list
 apt-get update
 apt-get install -y jq docker.io curl busybox python3-requests
+rm -rf /var/lib/apt/lists/*
+apt-get clean
