@@ -55,9 +55,9 @@ cat > /opt/cartesi/bin/yield-and-install << EOF
 	export CACHE_DIR=/opt/rollup-cache/
 	export STORE_DIR=/opt/rollup-store/
 	export IO_DEVICE=/dev/mtdblock1
+	ls -al /bin/busybox
 	CACHE_DIR=/opt/rollup-cache /opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-docker.sh
-	
-	mount -v /dev/mtdblock1 /opt/cartesi/dapp 2>&1
+
 	echo "entrypoint exited with \$? status"
 	dmesg
 	halt -f
@@ -91,6 +91,6 @@ cp /mnt/ipfs-config /etc/ipfs-config
 echo -n "root:cartesi" | chpasswd
 printf "deb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse" > /etc/apt/sources.list
 apt-get update
-apt-get install -y jq docker.io curl busybox python3-requests
+apt-get install --no-install-recommends -y docker.io curl busybox
 rm -rf /var/lib/apt/lists/*
 apt-get clean

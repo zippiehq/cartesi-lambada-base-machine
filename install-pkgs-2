@@ -1,8 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
 export DEBIAN_FRONTEND="noninteractive"
 dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb
+/opt/cartesi/bin/rndaddentropy < /opt/cartesi/var/run/random-seed
 
 cat > /opt/cartesi/bin/run-docker.sh << EOF
 #!/bin/bash
@@ -41,6 +42,24 @@ cat /tmp/boot-script
 /tmp/boot-script
 EOF
 chmod +x /opt/cartesi/bin/run-docker.sh
+
+find /usr/share/doc -depth -type f ! -name copyright|xargs rm || true
+find /usr/share/doc -empty|xargs rmdir || true
+rm -rf /usr/share/groff/* /usr/share/info/*
+rm -rf /usr/share/lintian/* /usr/share/linda/* /var/cache/man/*
+rm -rf /var/cache/apt/*.bin
+mv /usr/share/locale/en /tmp/en
+rm -rf /usr/share/locale/*
+rm -rf /usr/share/consolefonts/*
+
+mv /tmp/en /usr/share/locale/en
+locale-gen
+dpkg --remove ubuntu-minimal
+dpkg --remove ubuntu-advantage-tools
+dpkg --purge python3.10  python3 netplan.io lsb-release networkd-dispatcher python3-apt python3-dbus python3-gi python3-netifaces python3-pkg-resources python3-yaml libpython3-stdlib:riscv64 libpython3.10-stdlib python3.10-minimal python3-minimal
+find /usr/share/i18n/charmaps/ -type f ! -name UTF-8.gz -delete
+find /usr/share/i18n/locales/ -type f ! -name en_US ! -name en_GB ! -name i18n* ! -name iso14651_t1 ! -name iso14651_t1_common ! -name 'translit_*' -delete && echo 'en_US.UTF-8 UTF-8' > /usr/share/i18n/SUPPORTED
+rm -rf /usr/share/man/* /usr/share/doc/* /usr/share/X11/*
 mkfs.ext2 /dev/mtdblock2
 mkdir -p /dev/tmp
 mount -t tmpfs tmpfs /dev/tmp 
