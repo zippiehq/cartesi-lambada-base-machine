@@ -30,7 +30,7 @@ while true; do
         sleep 1
 done
 echo "IPFS up"
-echo "Getting first tx, which would set CID of /app"
+echo "Asking for app to guest tools which would set CID of /app"
 curl http://127.0.0.1:5004/get_app > /dev/null
 echo "/app":
 ipfs files ls /app
