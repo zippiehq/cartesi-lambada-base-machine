@@ -1,15 +1,17 @@
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS genext2fs-build
 RUN apt-get update && apt-get install -y ca-certificates
-RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
+RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
 RUN apt-get update && apt-get install -y git
 RUN git clone https://github.com/cartesi/genext2fs /genext2fs && cd /genext2fs && git checkout v1.5.2 && ./make-debian
 
 FROM golang:1.21 as kubo-build
-RUN apt-get update && apt-get install -y llvm
+RUN apt-get update && apt-get install -y llvm libgpgme-dev libassuan-dev libbtrfs-dev libdevmapper-dev pkg-config
 
 WORKDIR /app
 
 RUN git clone https://github.com/zippiehq/cartesi-kubo -b ipfs-cartesi kubo && cd kubo && git checkout 7e60dfc7980b6202e910f684429160141da8ad62
+
+RUN git clone https://github.com/stskeeps/umoci && cd umoci && git checkout 616d1d97233b83027311d4a760c17372a0fe6fb2 && make umoci.static GOOS=linux GOARCH=riscv64 
 
 WORKDIR /app/kubo
 RUN go mod download
@@ -20,7 +22,7 @@ RUN llvm-strip -s /app/kubo/cmd/ipfs/ipfs
 
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS build
 RUN apt-get update && apt-get install -y ca-certificates
-RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
+RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
 RUN apt-get update && apt-get install -y debootstrap patch libarchive13 e2tools
 ENV TZ=UTC
 ENV LC_ALL=C
@@ -30,7 +32,7 @@ ENV SOURCE_DATE_EPOCH=1695938400
 
 COPY --from=genext2fs-build /genext2fs/genext2fs.deb /genext2fs.deb
 RUN dpkg -i /genext2fs.deb
-RUN debootstrap --include=wget --foreign --arch riscv64 jammy /replicate/release https://snapshot.ubuntu.com/ubuntu/20230928T000000Z
+RUN debootstrap --include=wget --foreign --arch riscv64 jammy /replicate/release https://snapshot.ubuntu.com/ubuntu/20231201T000000Z
 RUN rm -rf /replicate/release/debootstrap/debootstrap.log
 RUN touch /replicate/release/debootstrap/debootstrap.log
 RUN echo -n "ubuntu" > /replicate/release/etc/hostname
@@ -48,7 +50,7 @@ RUN chmod 755 /replicate/release/sbin/install-from-mtdblock1
 RUN find "/replicate/release" \
 	-newermt "@1695938400" \
 	-exec touch --no-dereference --date="@1695938400" '{}' +
-RUN tar --sort=name -C /replicate/release -cf - . > /replicate/release.tar
+RUN tar --sort=name -C /replicate/release -vcf - . > /replicate/release.tar
 RUN HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /replicate/release.tar -B 4096 /replicate/source.ext2 2>&1 > /tool-image.gen
 RUN ls -al /replicate/source.ext2
 RUN rm -rf /replicate/release /replicate/release.tar
@@ -60,7 +62,7 @@ RUN rm /tool-image.tar
 
 COPY --from=cartesi/linux-kernel:0.16.0 /opt/riscv/kernel/artifacts/linux-5.15.63-ctsi-2.bin /usr/share/cartesi-machine/images/linux.bin
 RUN wget -O /usr/share/cartesi-machine/images/rom.bin https://github.com/cartesi/machine-emulator-rom/releases/download/v0.16.0/rom-v0.16.0.bin
-#20230928T000000Z
+#20231201T000000Z
 FROM cartesi/machine-emulator:0.15.2@sha256:bc4e65ed6dde506b7476a751ad9cda2fb136cbad655ff80df3180ca45444e440 AS cartesi-base
 COPY --from=build /replicate/source.ext2 /source.ext2
 COPY --from=build /usr/share/cartesi-machine/images /usr/share/cartesi-machine/images
@@ -84,9 +86,9 @@ RUN e2cp /extracted-rootfs.img:/rootfs.tar /rootfs.tar && mkdir -p /rootfs && cd
 
 FROM scratch AS riscv-base
 COPY --from=extracted-rootfs /rootfs /
-RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20230928T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
+RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
 RUN mkdir -p /mirror && cd /mirror && apt-get update --print-uris | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
-RUN cd /mirror && apt-get update && apt-get install -qq --print-uris --no-install-recommends docker.io curl busybox | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
+RUN cd /mirror && apt-get update && apt-get install -qq --print-uris --no-install-recommends crun curl busybox strace | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
 
 FROM build AS aptget-setup
 RUN rm -rf /tool-image
@@ -106,6 +108,7 @@ RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
 RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image.img 2>&1 > /tool-image.gen
 COPY ./machine-emulator-tools-v0.12.0.deb.new /tool-image/machine-emulator-tools-v0.12.0.deb
 COPY ./install-pkgs-2 /tool-image/install
+COPY --from=kubo-build /app/umoci/umoci.static /tool-image/umoci-insecure
 RUN chmod 755 /tool-image/install
 RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
 RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image2.img 2>&1 > /tool-image.gen
@@ -118,14 +121,16 @@ RUN truncate -s 8G /clean-image.ext2 && cartesi-machine --skip-root-hash-check -
 
 COPY ./rom.bin /artifacts/rom.bin
 COPY ./linux-5.15.63-ctsi-2-v0.17.0.bin /artifacts/linux-5.15.63-ctsi-2-v0.17.0.bin
-RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/opt/cartesi/bin/preinit systemd.unified_cgroup_hierarchy=0" \
+RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/opt/cartesi/bin/preinit systemd.unified_cgroup_hierarchy=0 rootfstype=ext4 ro" \
      --rom-image=/artifacts/rom.bin --ram-image=/artifacts/linux-5.15.63-ctsi-2-v0.17.0.bin --flash-drive="label:root,filename:/clean-image.ext2" --flash-drive="label:app,length:10Mi"  --ram-length=2Gi --store=/lambada-base-machine-presparse \
      --htif-yield-manual     --htif-yield-automatic --max-mcycle=0 && \
      cp -v --sparse=always -r /lambada-base-machine-presparse /lambada-base-machine && rm -rf /lambada-base-machine-presparse && \
-     tar --sparse --hole-detection=seek -zvcf /lambada-base-machine.tar.gz /lambada-base-machine && rm -rf /lambada-base-machine /artifacts/* /tool-image* /image.ext2 && \
+     tar --sparse --hole-detection=seek -zvcf /lambada-base-machine.tar.gz /lambada-base-machine && rm -rf /lambada-base-machine /tool-image* && \
      du -s -h /lambada-base-machine.tar.gz
+RUN tar -zcf /base-machine.tar.gz /artifacts /clean-image.ext2
 FROM busybox
 COPY --from=aptget-image /lambada-base-machine.tar.gz /lambada-base-machine.tar.gz
+COPY --from=aptget-image /base-machine.tar.gz /base-machine.tar.gz
 #RUN sha256sum /image.ext2
 
 #FROM busybox

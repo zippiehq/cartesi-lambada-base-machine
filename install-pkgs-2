@@ -3,6 +3,9 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
 export DEBIAN_FRONTEND="noninteractive"
 dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb
+cp /mnt/umoci-insecure /usr/bin
+chmod +x /usr/bin/umoci-insecure
+
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/var/run/random-seed
 
 cat > /opt/cartesi/bin/run-docker.sh << EOF
@@ -60,11 +63,14 @@ dpkg --purge python3.10  python3 netplan.io lsb-release networkd-dispatcher pyth
 find /usr/share/i18n/charmaps/ -type f ! -name UTF-8.gz -delete
 find /usr/share/i18n/locales/ -type f ! -name en_US ! -name en_GB ! -name i18n* ! -name iso14651_t1 ! -name iso14651_t1_common ! -name 'translit_*' -delete && echo 'en_US.UTF-8 UTF-8' > /usr/share/i18n/SUPPORTED
 rm -rf /usr/share/man/* /usr/share/doc/* /usr/share/X11/*
-mkfs.ext2 /dev/mtdblock2
+cat > /etc/fstab << EOF
+/dev/mtdblock0 / ext4 defaults,noatime 1 1
+EOF
+mkfs.ext4 -O ^has_journal /dev/mtdblock2
 mkdir -p /dev/tmp
 mount -t tmpfs tmpfs /dev/tmp 
 mkdir -p /dev/tmp/mnt
 mount /dev/mtdblock2 /dev/tmp/mnt
-cp -ax / /dev/tmp/mnt
+tar --one-file-system -pcf - / | tar -C /dev/tmp/mnt/ -xf -
 umount /dev/tmp/mnt
 sync
