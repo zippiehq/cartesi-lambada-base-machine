@@ -115,6 +115,7 @@ RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-ima
 
 FROM debootstrap-image AS aptget-image
 COPY --from=aptget-setup /tool-image.img /tool-image.img
+# XXX we should use our own kernel here
 RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
 COPY --from=aptget-setup /tool-image2.img /tool-image2.img
 RUN truncate -s 8G /clean-image.ext2 && cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image2.img --flash-drive=label:clean,filename:/clean-image.ext2,shared --ram-length=2Gi && rm -rf /tool-image.img && rm -rf /tool-image2.img && rm -rf /image.ext2
