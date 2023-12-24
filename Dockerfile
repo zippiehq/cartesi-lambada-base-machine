@@ -88,7 +88,7 @@ FROM scratch AS riscv-base
 COPY --from=extracted-rootfs /rootfs /
 RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
 RUN mkdir -p /mirror && cd /mirror && apt-get update --print-uris | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
-RUN cd /mirror && apt-get update && apt-get install -qq --print-uris --no-install-recommends crun curl busybox strace | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
+RUN cd /mirror && apt-get update && apt-get install -qq --print-uris --no-install-recommends docker.io crun curl busybox strace | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
 
 FROM build AS aptget-setup
 RUN rm -rf /tool-image
