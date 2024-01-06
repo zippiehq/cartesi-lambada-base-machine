@@ -16,16 +16,19 @@ cat > /opt/cartesi/bin/preinit << EOF
 /usr/bin/cp -ar /tmp /ram
 /usr/bin/cp -ar /var /ram
 /usr/bin/cp -ar /etc /ram
+/usr/bin/cp -ar /opt /ram
 /usr/bin/cp -ar /home /ram
 /usr/bin/cp -ar /root /ram
 /usr/bin/mount --bind /ram/tmp /tmp
 /usr/bin/mount --bind /ram/var /var
 /usr/bin/mount --bind /ram/etc /etc
+/usr/bin/mount --bind /ram/opt /opt
 /usr/bin/mount --bind /ram/home /home
 /usr/bin/mount --bind /ram/root /root
 exec /sbin/init
 EOF
-mkdir -p /ram
+# /tmpfs for RWA demo backwards compatiblity
+mkdir -p /ram /opt /tmpfs 
 mkdir -p /opt/cartesi/dapp
 chmod +x /opt/cartesi/bin/preinit
 cat > /opt/cartesi/bin/run-docker.sh << EOF
