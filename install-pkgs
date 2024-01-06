@@ -5,11 +5,27 @@ export DEBIAN_FRONTEND="noninteractive"
 dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb
 date -s '2023-12-02 00:00:00'
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/bin/rndaddentropy
+mkdir -p /
 cat > /opt/cartesi/bin/preinit << EOF
 #!/bin/sh
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/var/run/random-seed
+/bin/echo "/ram size configured as: \$CARTESI_TMPFS_SIZE"
+/usr/bin/mount -t tmpfs -o size=\$CARTESI_TMPFS_SIZE tmpfs /ram
+# move all to ram
+/bin/echo "Moving dynamic content to tmpfs ..." 
+/usr/bin/cp -ar /tmp /ram
+/usr/bin/cp -ar /var /ram
+/usr/bin/cp -ar /etc /ram
+/usr/bin/cp -ar /home /ram
+/usr/bin/cp -ar /root /ram
+/usr/bin/mount --bind /ram/tmp /tmp
+/usr/bin/mount --bind /ram/var /var
+/usr/bin/mount --bind /ram/etc /etc
+/usr/bin/mount --bind /ram/home /home
+/usr/bin/mount --bind /ram/root /root
 exec /sbin/init
 EOF
+mkdir -p /ram
 mkdir -p /opt/cartesi/dapp
 chmod +x /opt/cartesi/bin/preinit
 cat > /opt/cartesi/bin/run-docker.sh << EOF
@@ -21,7 +37,6 @@ export STORE_DIR=/opt/rollup-store/
 export IO_DEVICE=/dev/mtdblock1
 mkdir -p /opt/rollup-store
 mkdir -p /opt/rollup-cache
-#curl -X POST -d '{"status":"accept"}' -H "Content-Type: application/json" http://127.0.0.1:5004/finish
 /usr/bin/ipfs init /etc/ipfs-config
 /usr/bin/ipfs daemon --offline &
 echo "Waiting for IPFS"
@@ -38,9 +53,6 @@ while true; do
         sleep 1
 done
 echo "IPFS up"
-
-docker run --network host dapp:1.0
-
 EOF
 chmod +x /opt/cartesi/bin/run-docker.sh
 cat > /opt/cartesi/bin/yield-and-install << EOF
@@ -55,7 +67,6 @@ cat > /opt/cartesi/bin/yield-and-install << EOF
 	export CACHE_DIR=/opt/rollup-cache/
 	export STORE_DIR=/opt/rollup-store/
 	export IO_DEVICE=/dev/mtdblock1
-	ls -al /bin/busybox
 	CACHE_DIR=/opt/rollup-cache /opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-docker.sh
 
 	echo "entrypoint exited with \$? status"

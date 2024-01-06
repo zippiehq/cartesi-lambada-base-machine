@@ -69,7 +69,7 @@ COPY --from=build /usr/share/cartesi-machine/images /usr/share/cartesi-machine/i
 USER root
 
 FROM cartesi-base AS debootstrap-image
-RUN truncate -s 8G /image.ext2
+RUN truncate -s 2G /image.ext2
 # run copy
 RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/debootstrap/copy" --flash-drive=label:root,filename:/source.ext2 --flash-drive=label:dest,filename:/image.ext2,shared --ram-length=2Gi
 # actually debootstrap
@@ -77,7 +77,7 @@ RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 ini
 
 FROM debootstrap-image AS extract-rootfs-image
 COPY --from=build /extract-rootfs.img /extract-rootfs.img
-RUN truncate -s 5G /extracted-rootfs.img
+RUN truncate -s 2G /extracted-rootfs.img
 RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:install,filename:/extract-rootfs.img --flash-drive=label:out,filename:/extracted-rootfs.img,shared --ram-length=2Gi
 
 FROM build AS extracted-rootfs
@@ -118,11 +118,11 @@ COPY --from=aptget-setup /tool-image.img /tool-image.img
 # XXX we should use our own kernel here
 RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
 COPY --from=aptget-setup /tool-image2.img /tool-image2.img
-RUN truncate -s 8G /clean-image.ext2 && cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image2.img --flash-drive=label:clean,filename:/clean-image.ext2,shared --ram-length=2Gi && rm -rf /tool-image.img && rm -rf /tool-image2.img && rm -rf /image.ext2
+RUN truncate -s 550M /clean-image.ext2 && cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image2.img --flash-drive=label:clean,filename:/clean-image.ext2,shared --ram-length=2Gi && rm -rf /tool-image.img && rm -rf /tool-image2.img && rm -rf /image.ext2
 
 COPY ./rom.bin /artifacts/rom.bin
 COPY ./linux-5.15.63-ctsi-2-v0.17.0.bin /artifacts/linux-5.15.63-ctsi-2-v0.17.0.bin
-RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/opt/cartesi/bin/preinit systemd.unified_cgroup_hierarchy=0 rootfstype=ext4 ro" \
+RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/opt/cartesi/bin/preinit systemd.unified_cgroup_hierarchy=0 rootfstype=ext4 ro CARTESI_TMPFS_SIZE=1G" \
      --rom-image=/artifacts/rom.bin --ram-image=/artifacts/linux-5.15.63-ctsi-2-v0.17.0.bin --flash-drive="label:root,filename:/clean-image.ext2" --flash-drive="label:app,length:10Mi"  --ram-length=2Gi --store=/lambada-base-machine-presparse \
      --htif-yield-manual     --htif-yield-automatic --max-mcycle=0 && \
      cp -v --sparse=always -r /lambada-base-machine-presparse /lambada-base-machine && rm -rf /lambada-base-machine-presparse && \
