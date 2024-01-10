@@ -12,8 +12,6 @@ cat > /opt/cartesi/bin/run-docker.sh << EOF
 #!/bin/bash
 export IPFS_PATH=/opt/ipfs
 export HTTP_DATASTORE_URL=http://127.0.0.1:5004/ipfs
-export CACHE_DIR=/opt/rollup-cache/
-export STORE_DIR=/opt/rollup-store/
 export IO_DEVICE=/dev/mtdblock1
 mkdir -p /opt/rollup-store
 mkdir -p /opt/rollup-cache
@@ -35,10 +33,6 @@ done
 echo "IPFS up"
 echo "Asking for app to guest tools which would set CID of /app"
 curl http://127.0.0.1:5004/get_app > /dev/null
-echo "/app":
-ipfs files ls /app
-echo "/"
-ipfs files ls /
 ipfs files read /app/boot-script > /tmp/boot-script
 chmod +x /tmp/boot-script
 cat /tmp/boot-script

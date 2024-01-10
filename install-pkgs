@@ -67,10 +67,8 @@ cat > /opt/cartesi/bin/yield-and-install << EOF
 	fi
 	mkdir -p /opt/rollup-cache
 	mkdir -p /opt/rollup-store
-	export CACHE_DIR=/opt/rollup-cache/
-	export STORE_DIR=/opt/rollup-store/
 	export IO_DEVICE=/dev/mtdblock1
-	CACHE_DIR=/opt/rollup-cache /opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-docker.sh
+	/opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-docker.sh
 
 	echo "entrypoint exited with \$? status"
 	dmesg

@@ -9,9 +9,9 @@ RUN apt-get update && apt-get install -y llvm libgpgme-dev libassuan-dev libbtrf
 
 WORKDIR /app
 
-RUN git clone https://github.com/zippiehq/cartesi-kubo -b ipfs-cartesi kubo && cd kubo && git checkout 7e60dfc7980b6202e910f684429160141da8ad62
+RUN git clone https://github.com/zippiehq/cartesi-kubo -b ipfs-cartesi kubo && cd kubo && git checkout a9042bef91cf09f140bbf38034dca486d752d3f8
 
-RUN git clone https://github.com/stskeeps/umoci && cd umoci && git checkout 616d1d97233b83027311d4a760c17372a0fe6fb2 && make umoci.static GOOS=linux GOARCH=riscv64 
+RUN git clone https://github.com/stskeeps/umoci && cd umoci && git checkout 616d1d97233b83027311d4a760c17372a0fe6fb2 && make umoci.static GOOS=linux GOARCH=riscv64
 
 WORKDIR /app/kubo
 RUN go mod download
