@@ -13,6 +13,12 @@ RUN git clone https://github.com/zippiehq/cartesi-kubo -b ipfs-cartesi kubo && c
 
 RUN git clone https://github.com/stskeeps/umoci && cd umoci && git checkout 616d1d97233b83027311d4a760c17372a0fe6fb2 && make umoci.static GOOS=linux GOARCH=riscv64
 
+RUN git clone https://github.com/containerd/nerdctl && cd nerdctl && git checkout v1.7.3 && GOOS=linux GOARCH=riscv64 make binaries
+
+RUN git clone https://github.com/containerd/stargz-snapshotter && cd stargz-snapshotter && git checkout v0.15.1 && GOOS=linux GOARCH=riscv64 make containerd-stargz-grpc && GOOS=linux GOARCH=riscv64 make ctr-remote 
+
+RUN curl -OL https://github.com/moby/buildkit/releases/download/v0.12.5/buildkit-v0.12.5.linux-riscv64.tar.gz && tar xf buildkit-v0.12.5.linux-riscv64.tar.gz && rm -f buildkit-v0.12.5.linux-riscv64.tar.gz
+
 WORKDIR /app/kubo
 RUN go mod download
 COPY ./sys_linux_riscv64.go /go/pkg/mod/github.com/marten-seemann/tcp\@v0.0.0-20210406111302-dfbc87cc63fd/sys_linux_riscv64.go
@@ -88,7 +94,7 @@ FROM scratch AS riscv-base
 COPY --from=extracted-rootfs /rootfs /
 RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
 RUN mkdir -p /mirror && cd /mirror && apt-get update --print-uris | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
-RUN cd /mirror && apt-get update && apt-get install -qq --print-uris --no-install-recommends docker.io crun curl busybox strace | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
+RUN cd /mirror && apt-get update && apt-get install -qq --print-uris --no-install-recommends docker.io fuse3 crun curl busybox strace jq | cut -d "'" -f 2 | wget -nv --mirror -i - || true && cd /
 
 FROM build AS aptget-setup
 RUN rm -rf /tool-image
@@ -109,6 +115,12 @@ RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-ima
 COPY ./machine-emulator-tools-v0.12.0.deb.new /tool-image/machine-emulator-tools-v0.12.0.deb
 COPY ./install-pkgs-2 /tool-image/install
 COPY --from=kubo-build /app/umoci/umoci.static /tool-image/umoci-insecure
+COPY --from=kubo-build /app/nerdctl/_output/nerdctl /tool-image/nerdctl
+COPY --from=kubo-build /app/stargz-snapshotter/out/containerd-stargz-grpc /tool-image/containerd-stargz-grpc
+COPY --from=kubo-build /app/stargz-snapshotter/out/ctr-remote /tool-image/ctr-remote
+COPY --from=kubo-build /app/stargz-snapshotter/script/config /tool-image/stargz-config
+COPY --from=kubo-build /app/bin/* /tool-image/
+
 RUN chmod 755 /tool-image/install
 RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
 RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image2.img 2>&1 > /tool-image.gen
@@ -118,7 +130,7 @@ COPY --from=aptget-setup /tool-image.img /tool-image.img
 # XXX we should use our own kernel here
 RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
 COPY --from=aptget-setup /tool-image2.img /tool-image2.img
-RUN truncate -s 550M /clean-image.ext2 && cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image2.img --flash-drive=label:clean,filename:/clean-image.ext2,shared --ram-length=2Gi && rm -rf /tool-image.img && rm -rf /tool-image2.img && rm -rf /image.ext2
+RUN truncate -s 800M /clean-image.ext2 && cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image2.img --flash-drive=label:clean,filename:/clean-image.ext2,shared --ram-length=2Gi && rm -rf /tool-image.img && rm -rf /tool-image2.img && rm -rf /image.ext2
 
 COPY ./rom.bin /artifacts/rom.bin
 COPY ./linux-5.15.63-ctsi-2-v0.17.0.bin /artifacts/linux-5.15.63-ctsi-2-v0.17.0.bin

@@ -9,10 +9,15 @@ mkdir -p /
 cat > /opt/cartesi/bin/preinit << EOF
 #!/bin/sh
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/var/run/random-seed
-/bin/echo "/ram size configured as: \$CARTESI_TMPFS_SIZE"
-/usr/bin/mount -t tmpfs -o size=\$CARTESI_TMPFS_SIZE tmpfs /ram
+if [ x\$CARTESI_SCRATCH != x ]; then
+  mkfs.ext4 -F -F -O ^has_journal \$CARTESI_SCRATCH
+  /usr/bin/mount \$CARTESI_SCRATCH /ram
+else
+  /bin/echo "/ram size configured as: \$CARTESI_TMPFS_SIZE"
+  /usr/bin/mount -t tmpfs -o size=\$CARTESI_TMPFS_SIZE tmpfs /ram
+fi
 # move all to ram
-/bin/echo "Moving dynamic content to tmpfs ..." 
+/bin/echo "Moving dynamic content to tmpfs or scratch ..." 
 /usr/bin/cp -ar /tmp /ram
 /usr/bin/cp -ar /var /ram
 /usr/bin/cp -ar /etc /ram
@@ -62,7 +67,10 @@ cat > /opt/cartesi/bin/yield-and-install << EOF
 #!/bin/bash
 { 
 	if [ ! -e /dev/yield ]; then
-		echo "No /dev/yield, exiting"
+		echo "No /dev/yield"
+		mkdir -p /tmp/instructions
+		mount -t 9p -o trans=virtio instructions /tmp/instructions -oversion=9p2000.L
+		/tmp/instructions/boot-script
 		exit 0
 	fi
 	mkdir -p /opt/rollup-cache
@@ -103,7 +111,7 @@ cp /mnt/ipfs-config /etc/ipfs-config
 echo -n "root:cartesi" | chpasswd
 printf "deb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy-updates main restricted universe multiverse" > /etc/apt/sources.list
 apt-get update
-apt-get install --no-install-recommends -y docker.io crun curl busybox strace
+apt-get install --no-install-recommends -y docker.io crun curl busybox strace fuse3 jq
 
 rm -rf /var/lib/apt/lists/*
 apt-get clean
