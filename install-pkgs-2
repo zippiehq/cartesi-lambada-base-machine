@@ -13,7 +13,7 @@ chmod +x /usr/local/bin/containerd-stargz-grpc
 chmod +x /usr/bin/ctr-remote
 chmod +x /usr/bin/build*
 cp -rv /mnt/stargz-config/* /
-echo "" >> /etc/containerd-stargz-grpc/config.toml
+echo "" > /etc/containerd-stargz-grpc/config.toml
 echo "ipfs = true" >> /etc/containerd-stargz-grpc/config.toml
 echo "no_background_fetch = true" >> /etc/containerd-stargz-grpc/config.toml
 
