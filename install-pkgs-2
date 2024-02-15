@@ -4,12 +4,10 @@ export PATH
 export DEBIAN_FRONTEND="noninteractive"
 dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb
 mkdir -p /usr/local/bin/
-cp /mnt/umoci-insecure /usr/bin
 cp /mnt/nerdctl /usr/bin
 cp /mnt/containerd-stargz-grpc /usr/local/bin
 cp /mnt/ctr-remote /usr/bin
 cp /mnt/build* /usr/bin
-chmod +x /usr/bin/umoci-insecure
 chmod +x /usr/bin/nerdctl
 chmod +x /usr/local/bin/containerd-stargz-grpc
 chmod +x /usr/bin/ctr-remote
@@ -28,7 +26,7 @@ Documentation=https://github.com/moby/buildkit
 
 [Service]
 Type=notify
-ExecStart=/usr/bin/buildkitd --addr fd:// --oci-worker-snapshotter=stargz --oci-worker=true --containerd-worker=false
+ExecStart=/usr/bin/buildkitd --addr fd:// --oci-worker-snapshotter=stargz --oci-worker=true --containerd-worker=false --oci-worker-proxy-snapshotter-path=/run/containerd-stargz-grpc/containerd-stargz-grpc.sock
 
 [Install]
 WantedBy=multi-user.target
@@ -47,9 +45,23 @@ SocketMode=0660
 WantedBy=sockets.target
 EOF
 
+cat > /etc/systemd/network/20-eth0.network << EOF
+[Match]
+Name=eth0
+
+[Network]
+DHCP=yes
+
+[Link]
+RequiredForOnline=no
+ActivationPolicy=always-up
+
+EOF
+
 systemctl enable stargz-snapshotter
 systemctl enable buildkit.socket
 systemctl enable buildkit.service
+systemctl enable systemd-networkd.service
 
 echo -n "Enabled.."
 
