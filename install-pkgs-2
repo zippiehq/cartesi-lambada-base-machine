@@ -16,7 +16,7 @@ cp -rv /mnt/stargz-config/* /
 echo "" > /etc/containerd-stargz-grpc/config.toml
 echo "ipfs = true" >> /etc/containerd-stargz-grpc/config.toml
 echo "no_background_fetch = true" >> /etc/containerd-stargz-grpc/config.toml
-
+echo "disable_verification = true"  >> /etc/containerd-stargz-grpc/config.toml
 cat > /etc/systemd/system/buildkit.service << EOF
 [Unit]
 Description=BuildKit
