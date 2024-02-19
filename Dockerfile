@@ -15,14 +15,16 @@ RUN git clone https://github.com/containerd/nerdctl && cd nerdctl && git checkou
 
 RUN git clone https://github.com/containerd/stargz-snapshotter && cd stargz-snapshotter && git checkout v0.15.1 && GOOS=linux GOARCH=riscv64 make containerd-stargz-grpc && GOOS=linux GOARCH=riscv64 make ctr-remote 
 
-RUN curl -OL https://github.com/moby/buildkit/releases/download/v0.12.5/buildkit-v0.12.5.linux-riscv64.tar.gz && tar xf buildkit-v0.12.5.linux-riscv64.tar.gz && rm -f buildkit-v0.12.5.linux-riscv64.tar.gz
+RUN llvm-strip -s /app/nerdctl/_output/nerdctl
+RUN llvm-strip -s /app/stargz-snapshotter/out/containerd-stargz-grpc
+RUN llvm-strip -s /app/stargz-snapshotter/out/ctr-remote
 
 WORKDIR /app/kubo
 RUN go mod download
 COPY ./sys_linux_riscv64.go /go/pkg/mod/github.com/marten-seemann/tcp\@v0.0.0-20210406111302-dfbc87cc63fd/sys_linux_riscv64.go
 RUN GOOS=linux GOARCH=riscv64 CGO_ENABLED=0 GOFLAGS="-ldflags=-s-w -trimpath" make nofuse IPFS_PLUGINS="ds_http"
-RUN sha256sum /app/kubo/cmd/ipfs/ipfs
 RUN llvm-strip -s /app/kubo/cmd/ipfs/ipfs
+
 
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS build
 RUN apt-get update && apt-get install -y ca-certificates
@@ -116,7 +118,6 @@ COPY --from=kubo-build /app/nerdctl/_output/nerdctl /tool-image/nerdctl
 COPY --from=kubo-build /app/stargz-snapshotter/out/containerd-stargz-grpc /tool-image/containerd-stargz-grpc
 COPY --from=kubo-build /app/stargz-snapshotter/out/ctr-remote /tool-image/ctr-remote
 COPY --from=kubo-build /app/stargz-snapshotter/script/config /tool-image/stargz-config
-COPY --from=kubo-build /app/bin/* /tool-image/
 
 RUN chmod 755 /tool-image/install
 RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
@@ -131,7 +132,7 @@ RUN truncate -s 800M /clean-image.ext2 && cartesi-machine --skip-root-hash-check
 
 COPY ./rom.bin /artifacts/rom.bin
 COPY ./linux-5.15.63-ctsi-2-v0.17.0.bin /artifacts/linux-5.15.63-ctsi-2-v0.17.0.bin
-RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/opt/cartesi/bin/preinit systemd.unified_cgroup_hierarchy=0 rootfstype=ext4 ro CARTESI_TMPFS_SIZE=1G" \
+RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/opt/cartesi/bin/preinit systemd.unified_cgroup_hierarchy=0 rootfstype=ext4 ro CARTESI_TMPFS_SIZE=1G systemd.journald.forward_to_console=1" \
      --rom-image=/artifacts/rom.bin --ram-image=/artifacts/linux-5.15.63-ctsi-2-v0.17.0.bin --flash-drive="label:root,filename:/clean-image.ext2" --flash-drive="label:app,length:10Mi"  --ram-length=2Gi --store=/lambada-base-machine-presparse \
      --htif-yield-manual     --htif-yield-automatic --max-mcycle=0 && \
      cp -v --sparse=always -r /lambada-base-machine-presparse /lambada-base-machine && rm -rf /lambada-base-machine-presparse && \

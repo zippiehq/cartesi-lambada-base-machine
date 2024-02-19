@@ -36,12 +36,10 @@ EOF
 mkdir -p /ram /opt /tmpfs 
 mkdir -p /opt/cartesi/dapp
 chmod +x /opt/cartesi/bin/preinit
-cat > /opt/cartesi/bin/run-docker.sh << EOF
+cat > /opt/cartesi/bin/run-app.sh << EOF
 #!/bin/bash
-export IPFS_PATH=/opt/ipfs
+export IPFS_PATH=/root/.ipfs
 export HTTP_DATASTORE_URL=http://127.0.0.1:5004/ipfs
-export CACHE_DIR=/opt/rollup-cache/
-export STORE_DIR=/opt/rollup-store/
 export IO_DEVICE=/dev/mtdblock1
 mkdir -p /opt/rollup-store
 mkdir -p /opt/rollup-cache
@@ -61,28 +59,32 @@ while true; do
         sleep 1
 done
 echo "IPFS up"
+echo "Asking for app to guest tools which would set CID of /app"
+curl http://127.0.0.1:5004/get_app > /dev/null
+ipfs files read /app/boot-script > /tmp/boot-script
+chmod +x /tmp/boot-script
+cat /tmp/boot-script
+/tmp/boot-script
 EOF
-chmod +x /opt/cartesi/bin/run-docker.sh
+chmod +x /opt/cartesi/bin/run-app.sh
 cat > /opt/cartesi/bin/yield-and-install << EOF
 #!/bin/bash
-{ 
 	if [ ! -e /dev/yield ]; then
 		echo "No /dev/yield"
 		mkdir -p /tmp/instructions
 		mount -t 9p -o trans=virtio instructions /tmp/instructions -oversion=9p2000.L
 		/tmp/instructions/boot-script
-		exit 0
+#		exit 0
 	fi
 	mkdir -p /opt/rollup-cache
 	mkdir -p /opt/rollup-store
 	export IO_DEVICE=/dev/mtdblock1
-	/opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-docker.sh
+	/opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-app.sh
 
 	echo "entrypoint exited with \$? status"
 	dmesg
 	halt -f
 	exit 0
-} 2>&1 > /dev/hvc0
 EOF
 
 chmod +x /opt/cartesi/bin/yield-and-install
@@ -90,19 +92,16 @@ chmod +x /opt/cartesi/bin/yield-and-install
 cat > /etc/systemd/system/yield-and-install.service << EOF
 [Unit]
 Description=First yield
-After=containerd.service
-Requires=containerd.service
+After=network.target
 
 [Service]
 Type=oneshot
 ExecStart=/opt/cartesi/bin/yield-and-install
 RemainAfterExit=yes
-StandardInput=console
-StandardOutput=journal+console
-StandardError=journal+console
 [Install]
 WantedBy=multi-user.target
 EOF
+
 systemctl enable yield-and-install.service
 cp /mnt/ipfs /usr/bin/ipfs
 chmod a+x /usr/bin/ipfs
