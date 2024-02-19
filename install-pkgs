@@ -74,7 +74,7 @@ cat > /opt/cartesi/bin/yield-and-install << EOF
 		mkdir -p /tmp/instructions
 		mount -t 9p -o trans=virtio instructions /tmp/instructions -oversion=9p2000.L
 		/tmp/instructions/boot-script
-#		exit 0
+		exit 0
 	fi
 	mkdir -p /opt/rollup-cache
 	mkdir -p /opt/rollup-store

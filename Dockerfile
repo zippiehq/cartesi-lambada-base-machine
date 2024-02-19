@@ -139,9 +139,13 @@ RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 ini
      tar --sparse --hole-detection=seek -zvcf /lambada-base-machine.tar.gz /lambada-base-machine && rm -rf /lambada-base-machine /tool-image* && \
      du -s -h /lambada-base-machine.tar.gz
 RUN tar -zcf /base-machine.tar.gz /artifacts /clean-image.ext2
+ARG ARCH=amd64
+RUN apt-get update && apt-get install -y curl && curl -LO https://github.com/ipfs/kubo/releases/download/v0.24.0/kubo_v0.24.0_linux-$ARCH.tar.gz && tar -xvzf kubo_v0.24.0_linux-$ARCH.tar.gz && bash kubo/install.sh && rm -rf kubo kubo_v0.24.0_linux-$ARCH.tar.gz
+RUN cd / && tar -vxf /lambada-base-machine.tar.gz && ipfs init && ipfs add --cid-version=1 --raw-leaves=false -r -Q /lambada-base-machine > /tmp/cid && (ipfs dag export `cat /tmp/cid` | gzip -9c > /lambada-base-machine.car.gz) && rm -rf $HOME/.ipfs && rm -rf /lambada-machine
 FROM busybox
 COPY --from=aptget-image /lambada-base-machine.tar.gz /lambada-base-machine.tar.gz
 COPY --from=aptget-image /base-machine.tar.gz /base-machine.tar.gz
+COPY --from=aptget-image /lambada-base-machine.car.gz /lambada-base-machine.car.gz
 #RUN sha256sum /image.ext2
 
 #FROM busybox
