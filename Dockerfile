@@ -66,10 +66,10 @@ RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-ima
 RUN HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 /extract-rootfs.img 2>&1 > /tool-image.gen
 RUN rm /tool-image.tar
 
-COPY --from=cartesi/linux-kernel:0.16.0 /opt/riscv/kernel/artifacts/linux-5.15.63-ctsi-2.bin /usr/share/cartesi-machine/images/linux.bin
-RUN wget -O /usr/share/cartesi-machine/images/rom.bin https://github.com/cartesi/machine-emulator-rom/releases/download/v0.16.0/rom-v0.16.0.bin
+
+COPY --from=cartesi/linux-kernel:0.19.1 /opt/riscv/kernel/artifacts/linux-6.5.9-ctsi-1-v0.19.1.bin /usr/share/cartesi-machine/images/linux.bin
 #20231201T000000Z
-FROM cartesi/machine-emulator:0.15.2@sha256:bc4e65ed6dde506b7476a751ad9cda2fb136cbad655ff80df3180ca45444e440 AS cartesi-base
+FROM cartesi/machine-emulator:0.16.0 AS cartesi-base
 COPY --from=build /replicate/source.ext2 /source.ext2
 COPY --from=build /usr/share/cartesi-machine/images /usr/share/cartesi-machine/images
 USER root
@@ -77,14 +77,14 @@ USER root
 FROM cartesi-base AS debootstrap-image
 RUN truncate -s 2G /image.ext2
 # run copy
-RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/debootstrap/copy" --flash-drive=label:root,filename:/source.ext2 --flash-drive=label:dest,filename:/image.ext2,shared --ram-length=2Gi
+RUN cartesi-machine --skip-root-hash-check --append-bootargs="loglevel=8 init=/debootstrap/copy ro" --flash-drive=label:root,filename:/source.ext2 --flash-drive=label:dest,filename:/image.ext2,shared --ram-length=2Gi || true
 # actually debootstrap
-RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/debootstrap/bootstrap" --flash-drive=label:root,filename:/image.ext2,shared --ram-length=2Gi
+RUN cartesi-machine --skip-root-hash-check --append-bootargs="loglevel=8 init=/debootstrap/bootstrap" --flash-drive=label:root,filename:/image.ext2,shared --ram-length=2Gi
 
 FROM debootstrap-image AS extract-rootfs-image
 COPY --from=build /extract-rootfs.img /extract-rootfs.img
 RUN truncate -s 2G /extracted-rootfs.img
-RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:install,filename:/extract-rootfs.img --flash-drive=label:out,filename:/extracted-rootfs.img,shared --ram-length=2Gi
+RUN cartesi-machine --skip-root-hash-check --append-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:install,filename:/extract-rootfs.img --flash-drive=label:out,filename:/extracted-rootfs.img,shared --ram-length=2Gi
 
 FROM build AS extracted-rootfs
 COPY --from=extract-rootfs-image /extracted-rootfs.img /extracted-rootfs.img
@@ -126,19 +126,18 @@ RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-ima
 FROM debootstrap-image AS aptget-image
 COPY --from=aptget-setup /tool-image.img /tool-image.img
 # XXX we should use our own kernel here
-RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
+RUN cartesi-machine --skip-root-hash-check --append-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
 COPY --from=aptget-setup /tool-image2.img /tool-image2.img
-RUN truncate -s 800M /clean-image.ext2 && cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image2.img --flash-drive=label:clean,filename:/clean-image.ext2,shared --ram-length=2Gi && rm -rf /tool-image.img && rm -rf /tool-image2.img && rm -rf /image.ext2
+RUN truncate -s 800M /clean-image.ext2 && cartesi-machine --skip-root-hash-check --append-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image2.img --flash-drive=label:clean,filename:/clean-image.ext2,shared --ram-length=2Gi && rm -rf /tool-image.img && rm -rf /tool-image2.img && rm -rf /image.ext2
+COPY ./linux-6.5.9-ctsi-1-v0.19.1.bin ./artifacts/linux-6.5.9-ctsi-1-v0.19.1.bin
 
-COPY ./rom.bin /artifacts/rom.bin
-COPY ./linux-5.15.63-ctsi-2-v0.17.0.bin /artifacts/linux-5.15.63-ctsi-2-v0.17.0.bin
-RUN cartesi-machine --skip-root-hash-check --append-rom-bootargs="loglevel=8 init=/opt/cartesi/bin/preinit systemd.unified_cgroup_hierarchy=0 rootfstype=ext4 ro CARTESI_TMPFS_SIZE=1G systemd.journald.forward_to_console=1" \
-     --rom-image=/artifacts/rom.bin --ram-image=/artifacts/linux-5.15.63-ctsi-2-v0.17.0.bin --flash-drive="label:root,filename:/clean-image.ext2" --flash-drive="label:app,length:10Mi"  --ram-length=2Gi --store=/lambada-base-machine-presparse \
-     --htif-yield-manual     --htif-yield-automatic --max-mcycle=0 && \
+RUN cartesi-machine --skip-root-hash-check --append-bootargs="no4lvl loglevel=8 init=/opt/cartesi/bin/preinit systemd.unified_cgroup_hierarchy=0 rootfstype=ext4 ro CARTESI_TMPFS_SIZE=1G systemd.journald.forward_to_console=1" \
+     --ram-image=./artifacts/linux-6.5.9-ctsi-1-v0.19.1.bin --flash-drive="label:root,filename:/clean-image.ext2" --flash-drive="label:app,length:10Mi"  --ram-length=2Gi --store=/lambada-base-machine-presparse \
+     --max-mcycle=0 && \
      cp -v --sparse=always -r /lambada-base-machine-presparse /lambada-base-machine && rm -rf /lambada-base-machine-presparse && \
      tar --sparse --hole-detection=seek -zvcf /lambada-base-machine.tar.gz /lambada-base-machine && rm -rf /lambada-base-machine /tool-image* && \
      du -s -h /lambada-base-machine.tar.gz
-RUN tar -zcf /base-machine.tar.gz /artifacts /clean-image.ext2
+RUN tar -zcf /base-machine.tar.gz ./artifacts /clean-image.ext2
 ARG ARCH=amd64
 RUN apt-get update && apt-get install -y curl && curl -LO https://github.com/ipfs/kubo/releases/download/v0.24.0/kubo_v0.24.0_linux-$ARCH.tar.gz && tar -xvzf kubo_v0.24.0_linux-$ARCH.tar.gz && bash kubo/install.sh && rm -rf kubo kubo_v0.24.0_linux-$ARCH.tar.gz
 RUN cd / && tar -vxf /lambada-base-machine.tar.gz && ipfs init && ipfs add --cid-version=1 --raw-leaves=false -r -Q /lambada-base-machine > /tmp/cid && (ipfs dag export `cat /tmp/cid` | gzip -9c > /lambada-base-machine.car.gz) && rm -rf $HOME/.ipfs && rm -rf /lambada-machine

@@ -40,7 +40,7 @@ cat > /opt/cartesi/bin/run-app.sh << EOF
 #!/bin/bash
 export IPFS_PATH=/root/.ipfs
 export HTTP_DATASTORE_URL=http://127.0.0.1:5004/ipfs
-export IO_DEVICE=/dev/mtdblock1
+export IO_DEVICE=/dev/pmem1
 mkdir -p /opt/rollup-store
 mkdir -p /opt/rollup-cache
 /usr/bin/ipfs init /etc/ipfs-config
@@ -78,7 +78,7 @@ cat > /opt/cartesi/bin/yield-and-install << EOF
 	fi
 	mkdir -p /opt/rollup-cache
 	mkdir -p /opt/rollup-store
-	export IO_DEVICE=/dev/mtdblock1
+	export IO_DEVICE=/dev/pmem1
 	/opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-app.sh
 
 	echo "entrypoint exited with \$? status"
