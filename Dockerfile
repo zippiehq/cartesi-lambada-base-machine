@@ -1,3 +1,5 @@
+FROM --platform=linux/amd64 ghcr.io/zippiehq/cartesi-lambada-kernel:main AS kernel
+
 FROM ubuntu:jammy@sha256:b060fffe8e1561c9c3e6dea6db487b900100fc26830b9ea2ec966c151ab4c020 AS genext2fs-build
 RUN apt-get update && apt-get install -y ca-certificates
 RUN printf "deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy-updates main restricted universe multiverse\n" > /etc/apt/sources.list
@@ -67,9 +69,9 @@ RUN HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-i
 RUN rm /tool-image.tar
 
 
-COPY --from=cartesi/linux-kernel:0.19.1 /opt/riscv/kernel/artifacts/linux-6.5.9-ctsi-1-v0.19.1.bin /usr/share/cartesi-machine/images/linux.bin
+COPY --from=kernel /opt/riscv/kernel/artifacts/linux-6.5.13-ctsi-1-v0.20.0.bin /usr/share/cartesi-machine/images/linux.bin
 #20231201T000000Z
-FROM cartesi/machine-emulator:0.16.0 AS cartesi-base
+FROM cartesi/machine-emulator:0.17.0 AS cartesi-base
 COPY --from=build /replicate/source.ext2 /source.ext2
 COPY --from=build /usr/share/cartesi-machine/images /usr/share/cartesi-machine/images
 USER root
@@ -106,13 +108,9 @@ RUN chmod 555 /tool-image/ipfs-config
 RUN chmod 755 /tool-image/ipfs
 COPY --from=riscv-base /mirror /tool-image/mirror
 
-#RUN wget https://github.com/cartesi/machine-emulator-tools/releases/download/v0.12.0/machine-emulator-tools-v0.12.0.deb && \
-#     echo "901e8343f7f2fe68555eb9f523f81430aa41487f9925ac6947e8244432396b3a machine-emulator-tools-v0.12.0.deb" | sha256sum -c -
-#RUN mv machine-emulator-tools-v0.12.0.deb /tool-image
-COPY ./machine-emulator-tools-v0.12.0.deb /tool-image/machine-emulator-tools-v0.12.0.deb
+RUN wget https://github.com/zippiehq/cartesi-lambada-guest-tools/releases/download/v0.15.0.1/machine-emulator-tools-v0.15.0.deb && mv machine-emulator-tools-v0.15.0.deb /tool-image/
 RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
 RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image.img 2>&1 > /tool-image.gen
-COPY ./machine-emulator-tools-v0.12.0.deb.new /tool-image/machine-emulator-tools-v0.12.0.deb
 COPY ./install-pkgs-2 /tool-image/install
 COPY --from=kubo-build /app/nerdctl/_output/nerdctl /tool-image/nerdctl
 COPY --from=kubo-build /app/stargz-snapshotter/out/containerd-stargz-grpc /tool-image/containerd-stargz-grpc
@@ -125,14 +123,13 @@ RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-ima
 
 FROM debootstrap-image AS aptget-image
 COPY --from=aptget-setup /tool-image.img /tool-image.img
-# XXX we should use our own kernel here
-RUN cartesi-machine --skip-root-hash-check --append-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
+COPY --from=kernel /opt/riscv/kernel/artifacts/linux-6.5.13-ctsi-1-v0.20.0.bin ./artifacts/linux.bin
+RUN cartesi-machine --ram-image=./artifacts/linux.bin --skip-root-hash-check --append-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2,shared --flash-drive=label:out,filename:/tool-image.img --ram-length=2Gi
 COPY --from=aptget-setup /tool-image2.img /tool-image2.img
 RUN truncate -s 800M /clean-image.ext2 && cartesi-machine --skip-root-hash-check --append-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image2.img --flash-drive=label:clean,filename:/clean-image.ext2,shared --ram-length=2Gi && rm -rf /tool-image.img && rm -rf /tool-image2.img && rm -rf /image.ext2
-COPY ./linux-6.5.9-ctsi-1-v0.19.1.bin ./artifacts/linux-6.5.9-ctsi-1-v0.19.1.bin
 
 RUN cartesi-machine --skip-root-hash-check --append-bootargs="no4lvl loglevel=8 init=/opt/cartesi/bin/preinit systemd.unified_cgroup_hierarchy=0 rootfstype=ext4 ro CARTESI_TMPFS_SIZE=1G systemd.journald.forward_to_console=1" \
-     --ram-image=./artifacts/linux-6.5.9-ctsi-1-v0.19.1.bin --flash-drive="label:root,filename:/clean-image.ext2" --flash-drive="label:app,length:10Mi"  --ram-length=2Gi --store=/lambada-base-machine-presparse \
+     --ram-image=./artifacts/linux.bin --flash-drive="label:root,filename:/clean-image.ext2" --flash-drive="label:app,length:10Mi"  --ram-length=2Gi --store=/lambada-base-machine-presparse \
      --max-mcycle=0 && \
      cp -v --sparse=always -r /lambada-base-machine-presparse /lambada-base-machine && rm -rf /lambada-base-machine-presparse && \
      tar --sparse --hole-detection=seek -zvcf /lambada-base-machine.tar.gz /lambada-base-machine && rm -rf /lambada-base-machine /tool-image* && \

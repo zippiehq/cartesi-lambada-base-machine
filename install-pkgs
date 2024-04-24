@@ -69,8 +69,8 @@ EOF
 chmod +x /opt/cartesi/bin/run-app.sh
 cat > /opt/cartesi/bin/yield-and-install << EOF
 #!/bin/bash
-	if [ ! -e /dev/yield ]; then
-		echo "No /dev/yield"
+	if [ ! -e /dev/cmio ]; then
+		echo "No /dev/cmio"
 		mkdir -p /tmp/instructions
 		mount -t 9p -o trans=virtio instructions /tmp/instructions -oversion=9p2000.L
 		/tmp/instructions/boot-script
