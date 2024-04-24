@@ -110,16 +110,18 @@ COPY --from=riscv-base /mirror /tool-image/mirror
 
 RUN wget https://github.com/zippiehq/cartesi-lambada-guest-tools/releases/download/v0.15.0.1/machine-emulator-tools-v0.15.0.deb && mv machine-emulator-tools-v0.15.0.deb /tool-image/
 RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
-RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image.img 2>&1 > /tool-image.gen
+RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 524288 /tool-image.img 2>&1 > /tool-image.gen
 COPY ./install-pkgs-2 /tool-image/install
 COPY --from=kubo-build /app/nerdctl/_output/nerdctl /tool-image/nerdctl
 COPY --from=kubo-build /app/stargz-snapshotter/out/containerd-stargz-grpc /tool-image/containerd-stargz-grpc
 COPY --from=kubo-build /app/stargz-snapshotter/out/ctr-remote /tool-image/ctr-remote
 COPY --from=kubo-build /app/stargz-snapshotter/script/config /tool-image/stargz-config
+RUN du -s -h /tool-image
 
 RUN chmod 755 /tool-image/install
 RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
-RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 2097152 /tool-image2.img 2>&1 > /tool-image.gen
+RUN du -s -h /tool-image
+RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 524288 /tool-image2.img 2>&1 > /tool-image.gen
 
 FROM debootstrap-image AS aptget-image
 COPY --from=aptget-setup /tool-image.img /tool-image.img
