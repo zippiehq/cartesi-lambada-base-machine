@@ -27,9 +27,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download dependencies
-        run: make download
-
       - name: Build docker image
         id: docker_build
         uses: docker/build-push-action@v4
