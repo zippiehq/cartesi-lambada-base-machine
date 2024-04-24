@@ -10,9 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Retrieve environment variables
-        run: make env >> $GITHUB_ENV
-
       - name: Docker meta
         id: docker_meta
         uses: docker/metadata-action@v4
