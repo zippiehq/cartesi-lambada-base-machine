@@ -5,7 +5,7 @@ export DEBIAN_FRONTEND="noninteractive"
 dpkg -i /mnt/machine-emulator-tools-v0.15.0.deb
 date -s '2023-12-02 00:00:00'
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/bin/rndaddentropy
-mkdir -p /
+mkdir -p /opt/cartesi/bin/
 cat > /opt/cartesi/bin/preinit << EOF
 #!/bin/sh
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/var/run/random-seed
