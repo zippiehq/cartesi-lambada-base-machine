@@ -130,7 +130,7 @@ RUN cartesi-machine --ram-image=./artifacts/linux.bin --skip-root-hash-check --a
 COPY --from=aptget-setup /tool-image2.img /tool-image2.img
 RUN truncate -s 800M /clean-image.ext2 && cartesi-machine --skip-root-hash-check --append-bootargs="loglevel=8 init=/sbin/install-from-mtdblock1" --flash-drive=label:root,filename:/image.ext2 --flash-drive=label:out,filename:/tool-image2.img --flash-drive=label:clean,filename:/clean-image.ext2,shared --ram-length=2Gi && rm -rf /tool-image.img && rm -rf /tool-image2.img && rm -rf /image.ext2
 
-RUN cartesi-machine --skip-root-hash-check --append-bootargs="no4lvl loglevel=8 init=/opt/cartesi/bin/preinit systemd.unified_cgroup_hierarchy=0 rootfstype=ext4 ro CARTESI_TMPFS_SIZE=1G systemd.journald.forward_to_console=1" \
+RUN cartesi-machine --skip-root-hash-check --append-bootargs="no4lvl loglevel=8 init=/usr/sbin/cartesi-preinit systemd.unified_cgroup_hierarchy=0 rootfstype=ext4 ro CARTESI_TMPFS_SIZE=1G systemd.journald.forward_to_console=1" \
      --ram-image=./artifacts/linux.bin --flash-drive="label:root,filename:/clean-image.ext2" --flash-drive="label:app,length:10Mi"  --ram-length=2Gi --store=/lambada-base-machine-presparse \
      --max-mcycle=0 && \
      cp -v --sparse=always -r /lambada-base-machine-presparse /lambada-base-machine && rm -rf /lambada-base-machine-presparse && \

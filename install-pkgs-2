@@ -33,8 +33,8 @@ systemctl enable systemd-networkd.service
 echo -n "Enabled.."
 
 
-mkdir -p /opt/cartesi/bin/
-cat > /opt/cartesi/bin/run-app.sh << EOF
+mkdir -p /usr/bin/
+cat > /usr/bin/cartesi-run-app.sh << EOF
 #!/bin/bash
 export IPFS_PATH=/root/.ipfs
 export HTTP_DATASTORE_URL=http://127.0.0.1:5004/ipfs
@@ -64,7 +64,7 @@ chmod +x /tmp/boot-script
 cat /tmp/boot-script
 /tmp/boot-script
 EOF
-chmod +x /opt/cartesi/bin/run-app.sh
+chmod +x /usr/bin/cartesi-run-app.sh
 
 find /usr/share/doc -depth -type f ! -name copyright|xargs rm || true
 find /usr/share/doc -empty|xargs rmdir || true

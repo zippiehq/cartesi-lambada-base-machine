@@ -4,11 +4,8 @@ export PATH
 export DEBIAN_FRONTEND="noninteractive"
 dpkg -i /mnt/machine-emulator-tools-v0.15.0.deb
 date -s '2023-12-02 00:00:00'
-/opt/cartesi/bin/rndaddentropy < /opt/cartesi/bin/rndaddentropy
-mkdir -p /opt/cartesi/bin/
-cat > /opt/cartesi/bin/preinit << EOF
+cat > /usr/sbin/lambada-preinit << EOF
 #!/bin/sh
-/opt/cartesi/bin/rndaddentropy < /opt/cartesi/var/run/random-seed
 if [ x\$CARTESI_SCRATCH != x ]; then
   mkfs.ext4 -F -F -O ^has_journal \$CARTESI_SCRATCH
   /usr/bin/mount \$CARTESI_SCRATCH /ram
@@ -34,61 +31,29 @@ exec /sbin/init
 EOF
 # /tmpfs for RWA demo backwards compatiblity
 mkdir -p /ram /opt /tmpfs 
-mkdir -p /opt/cartesi/dapp
-chmod +x /opt/cartesi/bin/preinit
-cat > /opt/cartesi/bin/run-app.sh << EOF
+chmod +x /usr/sbin/lambada-preinit
+
+
+cat > /usr/bin/yield-and-install << EOF
 #!/bin/bash
-export IPFS_PATH=/root/.ipfs
-export HTTP_DATASTORE_URL=http://127.0.0.1:5004/ipfs
-export IO_DEVICE=/dev/pmem1
-mkdir -p /opt/rollup-store
-mkdir -p /opt/rollup-cache
-/usr/bin/ipfs init /etc/ipfs-config
-/usr/bin/ipfs daemon --offline &
-echo "Waiting for IPFS"
-IPFS_HOST="127.0.0.1"
-IPFS_PORT="5001"
+       if [ ! -e /dev/cmio ]; then
+               echo "No /dev/cmio"
+               mkdir -p /tmp/instructions
+               mount -t 9p -o trans=virtio instructions /tmp/instructions -oversion=9p2000.L
+               /tmp/instructions/boot-script
+               exit 0
+       fi
+       mkdir -p /opt/rollup-cache
+       mkdir -p /opt/rollup-store
+       export IO_DEVICE=/dev/pmem1
+       /usr/bin/rollup-init /usr/bin/lambada-rollup-server /usr/bin/cartesi-run-app.sh
 
-while true; do
-	nc -z "\$IPFS_HOST" "\$IPFS_PORT"
-        RET=\$?
-        echo \$RET
-        if [ x\$RET = x0 ]; then
-           break
-        fi
-        sleep 1
-done
-echo "IPFS up"
-echo "Asking for app to guest tools which would set CID of /app"
-curl http://127.0.0.1:5004/get_app > /dev/null
-ipfs files read /app/boot-script > /tmp/boot-script
-chmod +x /tmp/boot-script
-cat /tmp/boot-script
-/tmp/boot-script
+       echo "entrypoint exited with \$? status"
+       dmesg
+       halt -f
+       exit 0
 EOF
-chmod +x /opt/cartesi/bin/run-app.sh
-cat > /opt/cartesi/bin/yield-and-install << EOF
-#!/bin/bash
-	if [ ! -e /dev/cmio ]; then
-		echo "No /dev/cmio"
-		mkdir -p /tmp/instructions
-		mount -t 9p -o trans=virtio instructions /tmp/instructions -oversion=9p2000.L
-		/tmp/instructions/boot-script
-		exit 0
-	fi
-	mkdir -p /opt/rollup-cache
-	mkdir -p /opt/rollup-store
-	export IO_DEVICE=/dev/pmem1
-	/opt/cartesi/bin/rollup-init /opt/cartesi/bin/run-app.sh
-
-	echo "entrypoint exited with \$? status"
-	dmesg
-	halt -f
-	exit 0
-EOF
-
-chmod +x /opt/cartesi/bin/yield-and-install
-
+chmod +x /usr/bin/yield-and-install
 cat > /etc/systemd/system/yield-and-install.service << EOF
 [Unit]
 Description=First yield
@@ -96,7 +61,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/opt/cartesi/bin/yield-and-install
+ExecStart=/usr/bin/yield-and-install
 RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
