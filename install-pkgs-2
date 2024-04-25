@@ -2,7 +2,6 @@
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
 export DEBIAN_FRONTEND="noninteractive"
-dpkg -i /mnt/machine-emulator-tools-v0.15.0.deb
 mkdir -p /usr/local/bin/
 cp /mnt/nerdctl /usr/bin
 cp /mnt/containerd-stargz-grpc /usr/local/bin
@@ -34,8 +33,7 @@ systemctl enable systemd-networkd.service
 echo -n "Enabled.."
 
 
-/opt/cartesi/bin/rndaddentropy < /opt/cartesi/var/run/random-seed
-
+mkdir -p /opt/cartesi/bin/
 cat > /opt/cartesi/bin/run-app.sh << EOF
 #!/bin/bash
 export IPFS_PATH=/root/.ipfs

@@ -40,7 +40,7 @@ ENV SOURCE_DATE_EPOCH=1695938400
 
 COPY --from=genext2fs-build /genext2fs/genext2fs.deb /genext2fs.deb
 RUN dpkg -i /genext2fs.deb
-RUN debootstrap --include=wget --foreign --arch riscv64 jammy /replicate/release https://snapshot.ubuntu.com/ubuntu/20231201T000000Z
+RUN debootstrap --include=wget,busybox-static --foreign --arch riscv64 jammy /replicate/release https://snapshot.ubuntu.com/ubuntu/20231201T000000Z
 RUN rm -rf /replicate/release/debootstrap/debootstrap.log
 RUN touch /replicate/release/debootstrap/debootstrap.log
 RUN echo -n "ubuntu" > /replicate/release/etc/hostname

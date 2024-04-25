@@ -2,7 +2,7 @@
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH
 export DEBIAN_FRONTEND="noninteractive"
-dpkg -i /mnt/machine-emulator-tools-v0.12.0.deb
+dpkg -i /mnt/machine-emulator-tools-v0.15.0.deb
 date -s '2023-12-02 00:00:00'
 /opt/cartesi/bin/rndaddentropy < /opt/cartesi/bin/rndaddentropy
 mkdir -p /
