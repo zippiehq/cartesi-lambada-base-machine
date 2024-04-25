@@ -46,7 +46,7 @@ cat > /usr/bin/yield-and-install << EOF
        mkdir -p /opt/rollup-cache
        mkdir -p /opt/rollup-store
        export IO_DEVICE=/dev/pmem1
-       /usr/bin/rollup-init /usr/bin/lambada-rollup-server /usr/bin/cartesi-run-app.sh
+       /usr/sbin/rollup-init /usr/bin/lambada-rollup-server /usr/bin/cartesi-run-app.sh
 
        echo "entrypoint exited with \$? status"
        dmesg
