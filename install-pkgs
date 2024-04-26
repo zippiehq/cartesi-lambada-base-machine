@@ -75,7 +75,7 @@ cp /mnt/ipfs-config /etc/ipfs-config
 echo -n "root:cartesi" | chpasswd
 printf "deb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy main restricted universe multiverse\ndeb [check-valid-until=no] file:/mnt/mirror/snapshot.ubuntu.com/ubuntu/20231201T000000Z jammy-updates main restricted universe multiverse" > /etc/apt/sources.list
 apt-get update
-apt-get install --no-install-recommends -y containerd curl busybox strace fuse3 jq
+apt-get install --no-install-recommends -y containerd curl strace fuse3 jq
 
 rm -rf /var/lib/apt/lists/*
 apt-get clean
