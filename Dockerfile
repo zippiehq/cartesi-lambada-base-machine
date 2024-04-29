@@ -108,7 +108,7 @@ RUN chmod 555 /tool-image/ipfs-config
 RUN chmod 755 /tool-image/ipfs
 COPY --from=riscv-base /mirror /tool-image/mirror
 
-RUN wget https://github.com/zippiehq/cartesi-lambada-guest-tools/releases/download/v0.15.0.1/machine-emulator-tools-v0.15.0.deb && mv machine-emulator-tools-v0.15.0.deb /tool-image/
+RUN wget https://github.com/zippiehq/cartesi-lambada-guest-tools/releases/download/v0.15.0.2/machine-emulator-tools-v0.15.0.deb && mv machine-emulator-tools-v0.15.0.deb /tool-image/
 RUN find /tool-image -exec touch --no-dereference --date="@1695938400" '{}' +
 RUN tar --sort=name -C /tool-image -cf - . > /tool-image.tar && rm -rf /tool-image && HOSTNAME=linux SOURCE_DATE_EPOCH=1695938400 genext2fs -z -v -v -f -a /tool-image.tar -B 4096 -b 524288 /tool-image.img 2>&1 > /tool-image.gen
 COPY ./install-pkgs-2 /tool-image/install
