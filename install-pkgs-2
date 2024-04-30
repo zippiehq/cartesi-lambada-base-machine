@@ -37,7 +37,7 @@ mkdir -p /usr/bin/
 cat > /usr/bin/cartesi-run-app.sh << EOF
 #!/bin/bash
 export IPFS_PATH=/root/.ipfs
-export HTTP_DATASTORE_URL=http://127.0.0.1:5004/ipfs
+export HTTP_DATASTORE_URL=http://127.0.0.1:5005/ipfs
 export IO_DEVICE=/dev/pmem1
 mkdir -p /opt/rollup-store
 mkdir -p /opt/rollup-cache
