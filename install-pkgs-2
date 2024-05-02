@@ -58,7 +58,7 @@ while true; do
 done
 echo "IPFS up"
 echo "Asking for app to guest tools which would set CID of /app"
-curl http://127.0.0.1:5004/get_app > /dev/null
+curl http://127.0.0.1:5005/get_app > /dev/null
 ipfs files read /app/boot-script > /tmp/boot-script
 chmod +x /tmp/boot-script
 cat /tmp/boot-script
